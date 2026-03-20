@@ -1,0 +1,142 @@
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Send, AtSign, X } from "lucide-react";
+import { useChatStore } from "@/store/useChatStore";
+
+export function MessageInput({
+  channelId,
+  userId,
+  allProfiles,
+  username,
+}: any) {
+  const [input, setInput] = useState("");
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState("");
+  const { replyTo, clearReplyTo } = useChatStore();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    const lastWord = val.split(" ").pop();
+    if (lastWord?.startsWith("@")) {
+      setMentionSearch(lastWord.slice(1).toLowerCase());
+      setShowMentions(true);
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  const insertMention = (username: string) => {
+    const words = input.split(" ");
+    words.pop();
+    setInput([...words, `@${username} `].join(" "));
+    setShowMentions(false);
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || !channelId || !userId) return;
+
+    const insertData: Record<string, string> = {
+      text: input,
+      channel_id: channelId,
+      user_id: userId,
+      user_name: username,
+    };
+    
+    if (replyTo?.id) {
+      insertData.reply_to_id = replyTo.id;
+    }
+
+    const { error } = await supabase.from("messages").insert([insertData]);
+
+    if (error) {
+      console.error("Insert Error:", error);
+    } else {
+      setInput("");
+      clearReplyTo();
+    }
+  };
+
+  const filteredMentions = allProfiles.filter((p: any) =>
+    p.username.toLowerCase().includes(mentionSearch),
+  );
+
+  return (
+    <form onSubmit={handleSendMessage} className="px-4 pb-4 shrink-0 relative">
+      {showMentions && filteredMentions.length > 0 && (
+        <div className="absolute bottom-full left-4 mb-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden w-56 z-50 animate-scale-in">
+          <div className="text-[10px] font-bold text-zinc-500 p-2.5 border-b border-white/5 uppercase bg-black/20 tracking-widest flex items-center gap-2">
+            <AtSign size={10} /> Mention User
+          </div>
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+            {filteredMentions.map((p: any) => (
+              <div
+                key={p.id}
+                onClick={() => insertMention(p.username)}
+                className="flex items-center gap-2.5 p-2.5 hover:bg-indigo-600/80 cursor-pointer transition-all group"
+              >
+                <img
+                  src={p.avatar_url || undefined}
+                  className="w-6 h-6 rounded-full bg-zinc-800"
+                  alt=""
+                />
+                <span className="text-xs font-semibold text-zinc-300 group-hover:text-white">
+                  {p.username}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {replyTo && (
+        <div className="mb-3 mx-4 relative pl-4 py-2.5 pr-3 bg-gradient-to-r from-indigo-500/10 via-indigo-500/5 to-transparent border-l-2 border-indigo-500/60 rounded-r-lg">
+          <div className="flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </div>
+                <span className="text-[11px] font-bold text-indigo-400 tracking-wide">
+                  Replying to {replyTo.username}
+                </span>
+              </div>
+              <p className="text-sm text-zinc-400/80 line-clamp-2 leading-relaxed pl-7">
+                {replyTo.text}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearReplyTo}
+              className="shrink-0 p-1.5 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-zinc-800/50 rounded-2xl px-4 py-3 border border-white/5 focus-within:border-indigo-500/50 focus-within:bg-zinc-800/70 transition-all shadow-inner">
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={input}
+            onChange={handleInputChange}
+            placeholder="Type a message..."
+            className="flex-1 bg-transparent w-full outline-none text-sm text-zinc-100 placeholder-zinc-600"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/30"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
