@@ -18,10 +18,13 @@ function MessageItemInner({
   isPinned,
   onReply,
   searchQuery,
+  myUsername,
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
   const isIphone = layoutMode === "iphone";
+  
+  const isMentioned = myUsername && !isMe && msg.text.includes(`@${myUsername}`);
 
   const isReadByOthers = useMemo(() => receipts?.some(
     (r: any) =>
@@ -82,7 +85,11 @@ function MessageItemInner({
 
       <div
         className={`relative flex items-start transition-all duration-200 ${
-          isIphone
+          isMentioned
+            ? isIphone
+              ? `px-4 ${isMe ? "flex-row-reverse" : "flex-row"} ${isGrouped ? "mt-0.5" : "mt-6"} bg-gradient-to-r from-indigo-500/[0.03] to-transparent`
+              : `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} bg-gradient-to-r from-indigo-500/[0.03] to-transparent`
+            : isIphone
             ? `px-4 ${isMe ? "flex-row-reverse" : "flex-row"} ${isGrouped ? "mt-0.5" : "mt-6"}`
             : `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} hover:bg-white/[0.02]`
         }`}

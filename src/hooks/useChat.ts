@@ -11,14 +11,42 @@ export function useChat(channelId: string | undefined, userId: string | undefine
         const fetchInitialData = async () => {
             const { data: msgData } = await supabase
                 .from('messages')
-                .select(`
-                    *,
-                    profiles:user_id(username, avatar_url),
-                    reply_to:messages!reply_to_id(text, profiles:user_id(username, avatar_url))
-                `)
+                .select('*')
                 .eq('channel_id', channelId)
                 .order('created_at', { ascending: true });
-            if (msgData) setMessages(msgData);
+            
+            if (msgData) {
+                const replyMsgIds = msgData
+                    .filter((m: any) => m.reply_to_id)
+                    .map((m: any) => m.reply_to_id);
+                
+                const replyMessagesResult = replyMsgIds.length > 0 
+                    ? await supabase
+                        .from('messages')
+                        .select('*, profiles:user_id(username, avatar_url)')
+                        .in('id', replyMsgIds)
+                    : { data: [] };
+                
+                const replyMessagesMap = new Map((replyMessagesResult.data || []).map((m: any) => [m.id, m]));
+                
+                const [msgWithProfiles] = await Promise.all([
+                    supabase
+                        .from('messages')
+                        .select('*, profiles:user_id(username, avatar_url)')
+                        .eq('channel_id', channelId)
+                        .order('created_at', { ascending: true })
+                ]);
+                
+                const enrichedMessages = (msgWithProfiles.data || []).map((m: any) => ({
+                    ...m,
+                    reply_to: m.reply_to_id && replyMessagesMap.has(m.reply_to_id) ? {
+                        ...replyMessagesMap.get(m.reply_to_id),
+                        profiles: replyMessagesMap.get(m.reply_to_id)?.profiles
+                    } : null
+                }));
+                
+                setMessages(enrichedMessages);
+            }
 
             const { data: recData } = await supabase
                 .from('read_receipts')
@@ -41,7 +69,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                     if (newMsg.reply_to_id) {
                         const { data: replyMsg } = await supabase
                             .from('messages')
-                            .select('text, profiles:user_id(username, avatar_url)')
+                            .select('*, profiles:user_id(username, avatar_url)')
                             .eq('id', newMsg.reply_to_id)
                             .single();
                         replyToData = replyMsg;

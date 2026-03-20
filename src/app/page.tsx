@@ -297,6 +297,7 @@ export default function Home() {
                         isPinned={isPinned(msg.id)}
                         onReply={handleReply}
                         searchQuery={searchQuery}
+                        myUsername={myProfile?.username}
                       />
                     </div>
                   );
