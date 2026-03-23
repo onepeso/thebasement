@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Mail, Lock, User, Loader2, ArrowRight, MessageSquare, Shield, Zap } from 'lucide-react';
+import { Mail, Lock, User, Loader2, ArrowRight, MessageSquare, Shield, Zap, Key, Copy, Check, RefreshCw } from 'lucide-react';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
+  const [error, setError] = useState('');
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeValid, setCodeValid] = useState<boolean | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -19,23 +24,83 @@ export default function AuthScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (inviteCode.length >= 4 && isSignUp) {
+      verifyInviteCode(inviteCode);
+    } else {
+      setCodeValid(null);
+    }
+  }, [inviteCode, isSignUp]);
+
+  const verifyInviteCode = async (code: string) => {
+    setVerifyingCode(true);
+    const { data, error } = await supabase
+      .from('invite_codes')
+      .select('id')
+      .eq('code', code.toUpperCase())
+      .single();
+    
+    if (error) {
+      setCodeValid(false);
+      setError('Invalid invite code');
+    } else if (data) {
+      setCodeValid(true);
+      setError('');
+    }
+    setVerifyingCode(false);
+  };
+
   const handleAuth = async () => {
     setLoading(true);
+    setError('');
+
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
+      if (!codeValid) {
+        setError('Please enter a valid invite code');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: { 
           data: { 
             username, 
+            invite_code: inviteCode.toUpperCase(),
             avatar_url: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}` 
           } 
         }
       });
-      if (error) alert(error.message);
+
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Mark invite code as used
+        const { data: codeData } = await supabase
+          .from('invite_codes')
+          .select('*')
+          .eq('code', inviteCode.toUpperCase())
+          .single();
+
+        if (codeData) {
+          await supabase
+            .from('invite_codes')
+            .update({ 
+              used_by: data.user.id, 
+              used_at: new Date().toISOString(),
+              current_uses: codeData.current_uses + 1 
+            })
+            .eq('id', codeData.id);
+        }
+      }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message);
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) setError(signInError.message);
     }
     setLoading(false);
   };
@@ -44,6 +109,12 @@ export default function AuthScreen() {
     if (e.key === 'Enter' && !loading) {
       handleAuth();
     }
+  };
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(inviteCode.toUpperCase());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const features = [
@@ -104,64 +175,112 @@ export default function AuthScreen() {
         <div className="absolute -inset-px bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-3xl opacity-40 blur-xl" />
         
         {/* Card */}
-        <div className="relative bg-zinc-950/90 backdrop-blur-3xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="relative bg-zinc-950/90 backdrop-blur-3xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl mx-4 sm:mx-0">
           
           {/* Top Gradient Bar */}
           <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500" />
           
-          <div className="p-10 lg:p-12">
+          <div className="p-6 sm:p-8 md:p-10 lg:p-12">
             {/* Header */}
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-600 shadow-2xl shadow-indigo-500/30 mb-6">
-                <span className="text-4xl font-black italic text-white">B</span>
+            <div className="text-center mb-6 sm:mb-8 md:mb-10">
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-600 shadow-2xl shadow-indigo-500/30 mb-4 sm:mb-6">
+                <span className="text-3xl sm:text-4xl font-black italic text-white">B</span>
               </div>
-              <h1 className="text-4xl font-black text-white mb-3 tracking-tight">The Basement</h1>
-              <p className="text-zinc-500 text-lg">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 sm:mb-3 tracking-tight">The Basement</h1>
+              <p className="text-zinc-500 text-sm sm:text-base md:text-lg">
                 {isSignUp ? 'Create your account' : 'Welcome back'}
               </p>
             </div>
 
             {/* Feature Badge */}
-            <div className="flex justify-center mb-8">
-              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-zinc-900/80 border border-white/5">
-                <FeatureIcon size={16} className={`text-${features[activeFeature].color}-400`} />
-                <span className="text-sm text-zinc-400">{features[activeFeature].title}</span>
+            <div className="flex justify-center mb-6 sm:mb-8">
+              <div className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-zinc-900/80 border border-white/5">
+                <FeatureIcon size={14} className={`sm:text-base text-${features[activeFeature].color}-400`} />
+                <span className="text-xs sm:text-sm text-zinc-400 hidden sm:inline">{features[activeFeature].title}</span>
               </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+                {error}
+              </div>
+            )}
+
             {/* Form */}
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               {isSignUp && (
-                <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
-                  <div className="relative flex items-center bg-zinc-900/60 rounded-xl border border-white/5 group-focus-within:border-indigo-500/30 transition-colors">
-                    <div className="pl-5">
-                      <User size={20} className="text-zinc-600" />
+                <>
+                  {/* Invite Code Input */}
+                  <div className="relative group">
+                    <div className={`absolute -inset-0.5 rounded-xl blur transition-opacity duration-300 ${codeValid === true ? 'bg-emerald-500/30 opacity-100' : codeValid === false ? 'bg-red-500/30 opacity-100' : 'opacity-0'} `} />
+                    <div className={`relative flex items-center bg-zinc-900/60 rounded-xl border transition-colors ${
+                      codeValid === true ? 'border-emerald-500/30' : 
+                      codeValid === false ? 'border-red-500/30' : 
+                      'border-white/5 group-focus-within:border-indigo-500/30'
+                    }`}>
+                      <div className="pl-4 sm:pl-5">
+                        {verifyingCode ? (
+                          <Loader2 size={18} className="sm:w-5 text-zinc-600 animate-spin" />
+                        ) : codeValid === true ? (
+                          <Check size={18} className="sm:w-5 text-emerald-400" />
+                        ) : codeValid === false ? (
+                          <RefreshCw size={18} className="sm:w-5 text-red-400" />
+                        ) : (
+                          <Key size={18} className="sm:w-5 text-zinc-600" />
+                        )}
+                      </div>
+                      <input 
+                        className="flex-1 bg-transparent py-3 sm:py-4 pl-3 sm:pl-4 pr-4 text-white placeholder:text-zinc-600 outline-none text-sm sm:text-base uppercase"
+                        placeholder="Invite code"
+                        value={inviteCode} 
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                        onKeyDown={handleKeyDown}
+                      />
+                      {inviteCode && (
+                        <button 
+                          onClick={copyCode}
+                          className="pr-4 sm:pr-5 text-zinc-600 hover:text-white transition-colors"
+                        >
+                          {copied ? <Check size={14} className="sm:w-4 text-emerald-400" /> : <Copy size={14} className="sm:w-4" />}
+                        </button>
+                      )}
                     </div>
-                    <input 
-                      className="flex-1 bg-transparent py-4 pl-4 pr-5 text-white placeholder:text-zinc-600 outline-none text-base"
-                      placeholder="Choose a username"
-                      value={username} 
-                      onChange={(e) => setUsername(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                    />
                   </div>
-                </div>
+
+                  {/* Username Input */}
+                  <div className="relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
+                    <div className="relative flex items-center bg-zinc-900/60 rounded-xl border border-white/5 group-focus-within:border-indigo-500/30 transition-colors">
+                      <div className="pl-4 sm:pl-5">
+                        <User size={18} className="sm:w-5 text-zinc-600" />
+                      </div>
+                      <input 
+                        className="flex-1 bg-transparent py-3 sm:py-4 pl-3 sm:pl-4 pr-4 sm:pr-5 text-white placeholder:text-zinc-600 outline-none text-sm sm:text-base"
+                        placeholder="Choose a username"
+                        value={username} 
+                        onChange={(e) => setUsername(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                      />
+                    </div>
+                  </div>
+                </>
               )}
-              
+               
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
                 <div className="relative flex items-center bg-zinc-900/60 rounded-xl border border-white/5 group-focus-within:border-indigo-500/30 transition-colors">
-                  <div className="pl-5">
-                    <Mail size={20} className="text-zinc-600" />
+                  <div className="pl-4 sm:pl-5">
+                    <Mail size={18} className="sm:w-5 text-zinc-600" />
                   </div>
                   <input 
-                    className="flex-1 bg-transparent py-4 pl-4 pr-5 text-white placeholder:text-zinc-600 outline-none text-base"
+                    className="flex-1 bg-transparent py-3 sm:py-4 pl-3 sm:pl-4 pr-4 sm:pr-5 text-white placeholder:text-zinc-600 outline-none text-sm sm:text-base"
                     type="email" 
-                    placeholder="Enter your email"
+                    placeholder="Your email"
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -169,34 +288,35 @@ export default function AuthScreen() {
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
                 <div className="relative flex items-center bg-zinc-900/60 rounded-xl border border-white/5 group-focus-within:border-indigo-500/30 transition-colors">
-                  <div className="pl-5">
-                    <Lock size={20} className="text-zinc-600" />
+                  <div className="pl-4 sm:pl-5">
+                    <Lock size={18} className="sm:w-5 text-zinc-600" />
                   </div>
                   <input 
-                    className="flex-1 bg-transparent py-4 pl-4 pr-5 text-white placeholder:text-zinc-600 outline-none text-base"
+                    className="flex-1 bg-transparent py-3 sm:py-4 pl-3 sm:pl-4 pr-4 sm:pr-5 text-white placeholder:text-zinc-600 outline-none text-sm sm:text-base"
                     type="password" 
-                    placeholder="Enter your password"
+                    placeholder="Your password"
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
                   />
                 </div>
               </div>
 
               {/* Submit Button */}
               <button 
-                disabled={loading || !email || !password || (isSignUp && !username)} 
-                onClick={handleAuth} 
+                disabled={loading || !email || !password || (isSignUp && (!username || !inviteCode || !codeValid))} 
+                onClick={handleAuth}
                 className="relative w-full group disabled:opacity-50 disabled:cursor-not-allowed mt-2"
               >
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl blur opacity-40 group-hover:opacity-70 transition-opacity" />
-                <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl py-4 font-semibold text-white transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl py-3 sm:py-4 font-semibold text-white transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
                   {loading ? (
-                    <Loader2 size={24} className="animate-spin" />
+                    <Loader2 size={20} className="sm:w-6 animate-spin" />
                   ) : (
                     <>
-                      <span className="text-lg">{isSignUp ? 'Create Account' : 'Sign In'}</span>
-                      <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                      <span className="text-sm sm:text-base">{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                      <ArrowRight size={18} className="sm:w-5 group-hover:translate-x-1 transition-transform" />
                     </>
                   )}
                 </div>
@@ -204,7 +324,7 @@ export default function AuthScreen() {
             </div>
 
             {/* Divider */}
-            <div className="flex items-center gap-4 my-8">
+            <div className="flex items-center gap-4 my-6 sm:my-8">
               <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
               <span className="text-xs text-zinc-600 uppercase tracking-wider">or</span>
               <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -213,8 +333,8 @@ export default function AuthScreen() {
             {/* Toggle */}
             <div className="text-center">
               <button 
-                onClick={() => setIsSignUp(!isSignUp)} 
-                className="text-base text-zinc-400 hover:text-white transition-colors"
+                onClick={() => { setIsSignUp(!isSignUp); setError(''); setInviteCode(''); setCodeValid(null); }} 
+                className="text-xs sm:text-sm md:text-base text-zinc-400 hover:text-white transition-colors"
               >
                 {isSignUp ? (
                   <>

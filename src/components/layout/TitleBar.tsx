@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Minus, X, Maximize2, Minimize2 } from "lucide-react";
+import { Minus, X, Maximize2, Minimize2, Settings } from "lucide-react";
+import { useChatStore } from "@/store/useChatStore";
 
 export function TitleBar() {
   const [windowApi, setWindowApi] = useState<any>(null);
   const [isMaximized, setIsMaximized] = useState(false);
+  const { setShowSettings } = useChatStore();
 
   useEffect(() => {
     import("@tauri-apps/api/window").then((m) => {
@@ -27,15 +29,25 @@ export function TitleBar() {
       data-tauri-drag-region
       className="h-10 flex justify-between items-center bg-zinc-950/80 backdrop-blur-xl cursor-default shrink-0 z-50 select-none"
     >
-      <div className="pl-4 flex items-center gap-3 pointer-events-none">
-        <div className="relative">
-          <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <span className="text-[10px] font-black italic text-white">B</span>
+      <div className="flex items-center gap-2">
+        <div className="pl-4 flex items-center gap-3 pointer-events-none">
+          <div className="relative">
+            <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <span className="text-[10px] font-black italic text-white">B</span>
+            </div>
           </div>
+          <span className="text-xs font-semibold text-zinc-400 tracking-wide">
+            The Basement
+          </span>
         </div>
-        <span className="text-xs font-semibold text-zinc-400 tracking-wide">
-          The Basement
-        </span>
+        
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-2 mr-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+          title="Settings"
+        >
+          <Settings size={16} />
+        </button>
       </div>
       
       <div className="flex h-full items-center">

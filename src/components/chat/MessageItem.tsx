@@ -1,6 +1,8 @@
 import { memo, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { Check, CheckCheck, Pencil, Trash2, Smile, Pin, PinOff, Reply } from "lucide-react";
+import { Check, CheckCheck, Pencil, Trash2, Smile, Pin, PinOff, Reply, MessageSquare } from "lucide-react";
+import { useChatStore } from "@/store/useChatStore";
+import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 
 function MessageItemInner({
   msg,
@@ -19,6 +21,9 @@ function MessageItemInner({
   onReply,
   searchQuery,
   myUsername,
+  thread,
+  isThreadRoot,
+  onOpenThread,
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -98,13 +103,11 @@ function MessageItemInner({
           className={`shrink-0 flex justify-center ${isIphone ? (isMe ? "ml-2.5" : "mr-2.5") + " mt-0.5" : "mr-4 w-10"}`}
         >
           {!isGrouped ? (
-            <img
-              src={
-                msg.profiles?.avatar_url ||
-                `https://ui-avatars.com/api/?name=${msg.profiles?.username}`
-              }
-              className={`${isIphone ? "w-8 h-8" : "w-10 h-10"} rounded-full object-cover ring-1 ring-white/10 shadow-lg transition-transform duration-200 group-hover:scale-105`}
-              alt=""
+            <AvatarWithEffect
+              profile={msg.profiles}
+              size={isIphone ? "sm" : "lg"}
+              showStatus={false}
+              onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
             />
           ) : (
             <div className={isIphone ? "w-8" : "w-10"} />
@@ -119,8 +122,9 @@ function MessageItemInner({
               className={`flex items-center gap-2 mb-1 group/name ${isIphone && isMe ? "flex-row-reverse space-x-reverse" : ""}`}
             >
               <span
-                className={`font-semibold tracking-tight ${isIphone ? "text-[11px] text-zinc-500" : isMe ? "text-emerald-400 text-[13px]" : "text-indigo-400 text-[13px]"}`}
+                className={`font-semibold tracking-tight cursor-pointer hover:underline ${isIphone ? "text-[11px] text-zinc-500" : isMe ? "text-emerald-400 text-[13px]" : "text-indigo-400 text-[13px]"}`}
                 title={formatFullDate(msg.created_at)}
+                onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
               >
                 {msg.profiles?.username}
               </span>
@@ -241,7 +245,7 @@ function MessageItemInner({
               )}
             </div>
 
-            {(isMe || (!isMe && !isIphone)) && !isEditing && (
+              {(isMe || (!isMe && !isIphone)) && !isEditing && (
               <div className="relative flex flex-row items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
                 <button
                   onClick={() => onReactionClick && onReactionClick(msg)}
@@ -267,6 +271,21 @@ function MessageItemInner({
                   title={isPinned ? "Unpin" : "Pin"}
                 >
                   {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                </button>
+                <button
+                  onClick={() => onOpenThread && onOpenThread(msg)}
+                  className="relative p-1.5 rounded-lg transition-all"
+                  title={thread ? 'View thread' : 'Start thread'}
+                >
+                  <MessageSquare 
+                    size={14} 
+                    className={thread ? 'text-emerald-400' : 'text-zinc-600 group-hover:text-emerald-400'} 
+                  />
+                  {thread && (
+                    <span className={`absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center ${thread.reply_count > 0 ? 'bg-emerald-500' : 'bg-zinc-600'} text-white text-[10px] font-bold rounded-full shadow-sm`}>
+                      {thread.reply_count > 99 ? '99+' : thread.reply_count}
+                    </span>
+                  )}
                 </button>
                 {isMe && (
                   <>

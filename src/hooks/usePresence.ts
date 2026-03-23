@@ -1,14 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+
+const CHANNEL_NAME = 'online-users';
+
+let globalChannel: ReturnType<typeof supabase.channel> | null = null;
+let globalUserId: string | null = null;
+
+export async function cleanupPresence() {
+  if (globalChannel && globalUserId) {
+    try {
+      await globalChannel.untrack();
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+    globalChannel = null;
+    globalUserId = null;
+  }
+}
 
 export function usePresence(userId: string | undefined) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const userIdRef = useRef(userId);
 
   useEffect(() => {
-    // 1. Don't do anything if we don't have a user yet
+    userIdRef.current = userId;
+    globalUserId = userId || null;
+  }, [userId]);
+
+  useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase.channel('online-users', {
+    if (globalChannel) {
+      globalChannel.unsubscribe();
+    }
+
+    const channel = supabase.channel(CHANNEL_NAME, {
       config: {
         presence: {
           key: userId,
@@ -16,26 +42,43 @@ export function usePresence(userId: string | undefined) {
       },
     });
 
+    globalChannel = channel;
+
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
-        // Convert the presence state object into a simple array of user IDs
         const ids = Object.keys(state);
         setOnlineUsers(ids);
       })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        setOnlineUsers(prev => prev.filter(id => id !== key));
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          // 2. Broadcast our presence as soon as we connect
           await channel.track({
             online_at: new Date().toISOString(),
           });
         }
       });
 
-    return () => {
-      channel.unsubscribe();
+    const handleCleanup = async () => {
+      if (globalChannel && userIdRef.current) {
+        try {
+          await globalChannel.untrack();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        globalChannel = null;
+      }
     };
-  }, [userId]); // 3. IMPORTANT: userId must be in the dependency array
+
+    window.addEventListener('beforeunload', handleCleanup);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleCleanup);
+      handleCleanup();
+    };
+  }, [userId]);
 
   return onlineUsers;
 }

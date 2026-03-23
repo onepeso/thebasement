@@ -1,22 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Send, AtSign, X } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
+import { useToast } from "@/store/useToastStore";
+import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 
 export function MessageInput({
   channelId,
   userId,
   allProfiles,
   username,
-}: any) {
+  onTyping,
+  onStopTyping,
+}: {
+  channelId: string;
+  userId: string;
+  allProfiles: any[];
+  username: string;
+  onTyping?: () => void;
+  onStopTyping?: () => void;
+}) {
   const [input, setInput] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
   const { replyTo, clearReplyTo } = useChatStore();
+  const toast = useToast();
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInput(val);
+    
+    const now = Date.now();
+    if (now - lastTypingRef.current > 2000) {
+      onTyping?.();
+      lastTypingRef.current = now;
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      onStopTyping?.();
+    }, 1500);
+
     const lastWord = val.split(" ").pop();
     if (lastWord?.startsWith("@")) {
       setMentionSearch(lastWord.slice(1).toLowerCase());
@@ -26,16 +62,21 @@ export function MessageInput({
     }
   };
 
-  const insertMention = (username: string) => {
+  const insertMention = (mentionedUsername: string) => {
     const words = input.split(" ");
     words.pop();
-    setInput([...words, `@${username} `].join(" "));
+    setInput([...words, `@${mentionedUsername} `].join(" "));
     setShowMentions(false);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !channelId || !userId) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    onStopTyping?.();
 
     const insertData: Record<string, string> = {
       text: input,
@@ -52,6 +93,7 @@ export function MessageInput({
 
     if (error) {
       console.error("Insert Error:", error);
+      toast.error("Failed to send message");
     } else {
       setInput("");
       clearReplyTo();
@@ -76,11 +118,7 @@ export function MessageInput({
                 onClick={() => insertMention(p.username)}
                 className="flex items-center gap-2.5 p-2.5 hover:bg-indigo-600/80 cursor-pointer transition-all group"
               >
-                <img
-                  src={p.avatar_url || undefined}
-                  className="w-6 h-6 rounded-full bg-zinc-800"
-                  alt=""
-                />
+                <AvatarWithEffect profile={p} size="sm" showStatus={false} />
                 <span className="text-xs font-semibold text-zinc-300 group-hover:text-white">
                   {p.username}
                 </span>

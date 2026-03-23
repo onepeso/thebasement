@@ -1,0 +1,188 @@
+import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { X, Save, Circle, Settings } from 'lucide-react';
+import { useChatStore } from '@/store/useChatStore';
+import { AvatarWithEffect } from './AvatarWithEffect';
+import { useAuth } from '@/hooks/useAuth';
+import type { UserStatus } from '@/types/database';
+
+const STATUS_OPTIONS: { value: UserStatus; label: string; color: string }[] = [
+  { value: 'online', label: 'Online', color: 'bg-emerald-500' },
+  { value: 'away', label: 'Away', color: 'bg-yellow-500' },
+  { value: 'busy', label: 'Busy', color: 'bg-red-500' },
+  { value: 'dnd', label: 'Do Not Disturb', color: 'bg-red-600' },
+];
+
+interface ProfileModalProps {
+  profile: any;
+  onClose: () => void;
+}
+
+export function ProfileModal({ profile, onClose }: ProfileModalProps) {
+  const { setShowSettings } = useChatStore();
+  const { refetchProfiles } = useAuth();
+  const [username, setUsername] = useState(profile?.username || '');
+  const [bio, setBio] = useState(profile?.bio || '');
+  const [status, setStatus] = useState<UserStatus>(profile?.status || 'online');
+  const [saving, setSaving] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        username,
+        bio,
+        status,
+      })
+      .eq('id', profile.id);
+
+    setSaving(false);
+    if (!error) {
+      await refetchProfiles();
+      onClose();
+    }
+  };
+
+  const currentStatus = STATUS_OPTIONS.find(s => s.value === status);
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="relative w-full max-w-md animate-scale-in">
+        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-indigo-500/20 rounded-2xl blur-xl" />
+        
+        <div className="relative bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          {/* Banner */}
+          <div 
+            className="h-24 sm:h-32 relative bg-cover bg-center"
+            style={{ backgroundImage: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/80 to-transparent" />
+            
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 rounded-lg text-white/80 hover:text-white transition-all"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Avatar - clickable to settings */}
+            <button
+              onClick={() => { onClose(); setShowSettings(true); }}
+              className="absolute -bottom-8 left-4 group"
+            >
+              <AvatarWithEffect 
+                profile={profile} 
+                username={username}
+                size="xl"
+                showStatus={true}
+                className="group-hover:opacity-80 transition-opacity"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="p-2 bg-black/60 rounded-full">
+                  <Settings size={16} className="text-white" />
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="pt-12 sm:pt-14 px-4 sm:px-6 pb-6">
+            {/* Username */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="text-xl font-bold bg-transparent border-b border-transparent hover:border-white/20 focus:border-indigo-500 outline-none text-white w-full pb-1 transition-colors"
+                placeholder="Username"
+              />
+            </div>
+
+            {/* Status Picker */}
+            <div className="mb-4">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 block">
+                Status
+              </label>
+              <div className="relative">
+                <button
+                  onClick={() => setShowStatusPicker(!showStatusPicker)}
+                  className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-colors"
+                >
+                  <Circle size={12} className={`fill-current ${currentStatus?.color.replace('bg-', 'text-')}`} />
+                  <span className="text-sm text-zinc-300">{currentStatus?.label}</span>
+                </button>
+                
+                {showStatusPicker && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-zinc-800 rounded-xl border border-white/10 shadow-xl py-2 z-10">
+                    {STATUS_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => { setStatus(option.value); setShowStatusPicker(false); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 transition-colors ${status === option.value ? 'bg-indigo-500/20' : ''}`}
+                      >
+                        <Circle size={12} className={`${option.color}`} />
+                        <span className="text-sm text-zinc-300">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Settings Button */}
+            <button
+              onClick={() => { onClose(); setShowSettings(true); }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 mb-4 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl text-sm text-zinc-400 hover:text-white transition-colors border border-white/5"
+            >
+              <Settings size={16} />
+              Profile Settings
+            </button>
+
+            {/* Bio / What you're doing */}
+            <div className="mb-6">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 block">
+                What you're doing
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value.slice(0, 24))}
+                placeholder="Add a bio..."
+                maxLength={24}
+                className="w-full bg-zinc-800/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-indigo-500/50 resize-none h-16 transition-colors"
+              />
+              <div className="text-[10px] mt-1 text-right">
+                {bio.length >= 24 ? (
+                  <span className="text-red-400 animate-pulse">Max 24 characters</span>
+                ) : (
+                  <span className="text-zinc-600">{bio.length}/24</span>
+                )}
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Save size={18} />
+                  Save Changes
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

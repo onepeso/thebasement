@@ -23,7 +23,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 const replyMessagesResult = replyMsgIds.length > 0 
                     ? await supabase
                         .from('messages')
-                        .select('*, profiles:user_id(username, avatar_url)')
+                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
                         .in('id', replyMsgIds)
                     : { data: [] };
                 
@@ -32,7 +32,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 const [msgWithProfiles] = await Promise.all([
                     supabase
                         .from('messages')
-                        .select('*, profiles:user_id(username, avatar_url)')
+                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
                         .eq('channel_id', channelId)
                         .order('created_at', { ascending: true })
                 ]);
@@ -63,13 +63,13 @@ export function useChat(channelId: string | undefined, userId: string | undefine
             }, async (payload) => {
                 if (payload.eventType === 'INSERT') {
                     const newMsg = JSON.parse(JSON.stringify(payload.new)) as any; 
-                    const { data: prof } = await supabase.from('profiles').select('username, avatar_url').eq('id', newMsg.user_id).single();
+                    const { data: prof } = await supabase.from('profiles').select('id, username, avatar_url, bio, status, avatar_effect, avatar_overlays').eq('id', newMsg.user_id).single();
                     
                     let replyToData = null;
                     if (newMsg.reply_to_id) {
                         const { data: replyMsg } = await supabase
                             .from('messages')
-                            .select('*, profiles:user_id(username, avatar_url)')
+                            .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
                             .eq('id', newMsg.reply_to_id)
                             .single();
                         replyToData = replyMsg;
