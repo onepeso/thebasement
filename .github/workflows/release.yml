@@ -1,58 +1,53 @@
 name: Release
-
 on:
   push:
     tags:
-      - "v*"
-
-permissions:
-  contents: write
+      - "v*" # Triggers when you push a tag like v1.0.0
 
 jobs:
-  release:
+  publish:
     permissions:
       contents: write
+    runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
-          - platform: "macos-latest"
-            args: "--target aarch64-apple-darwin"
-          - platform: "ubuntu-22.04"
-            args: ""
-          - platform: "windows-latest"
-            args: ""
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
 
-    runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      # 1. Install pnpm
+      - uses: pnpm/action-setup@v3
         with:
-          node-version: lts/*
-          cache: pnpm
+          version: 9
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      # 2. Install Node.js
+      - uses: actions/setup-node@v4
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && matrix.args != '' && matrix.args }}
+          node-version: 20
+          cache: "pnpm"
 
-      - name: Install frontend dependencies
+      # 3. Install Rust (FIXED LINE BELOW)
+      - uses: dtolnay/rust-toolchain@stable
+
+      # 4. Install System Dependencies (Ubuntu only)
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: install frontend dependencies
         run: pnpm install
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+      # 5. Build and Release
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: "App v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: false
-          args: ${{ matrix.args }}
+          releaseBody: "New release! Download the installer below."
+          releaseDraft: true
