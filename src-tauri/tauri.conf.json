@@ -43,7 +43,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk5RUREQjBCODYxQUY5NDYKUldSRytScUdDOXZ0bVZaWlpZb0pHQnJFRUdGeXE0WHlXdnNwUWtNcE5ucGZTeXRqWEM3NHN2Rm0K",
       "endpoints": [
         "https://github.com/onepeso/thebasement/releases/latest/download/latest.json"
       ]
