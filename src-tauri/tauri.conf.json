@@ -44,7 +44,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk5RUREQjBCODYxQUY5NDYKUldSRytScUdDOXZ0bVZaWlpZb0pHQnJFRUdGeXE0WHlXdnNwUWtNcE5ucGZTeXRqWEM3NHN2Rm0K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1NzI2OUJDQkRGRTgxRjIKUldUeWdmNjl2R2x5SmNwQ3R4NG12VlB2eTNoL1dSNkxMY01lVmVKTmZhNHBhOFlQOE40c3EzaWwK",
       "endpoints": [
         "https://github.com/onepeso/thebasement/releases/latest/download/latest.json"
       ]
