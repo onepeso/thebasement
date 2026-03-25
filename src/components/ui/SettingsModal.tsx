@@ -3,8 +3,10 @@ import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/store/useChatStore';
 import { useToast } from '@/store/useToastStore';
 import { useAuth } from '@/hooks/useAuth';
-import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing } from 'lucide-react';
+import { useUpdate } from '@/hooks/useUpdate';
+import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info } from 'lucide-react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { getVersion } from '@tauri-apps/api/app';
 import type { UserStatus } from '@/types/database';
 
 const AVATAR_SEEDS = ['cool', 'tech', 'gamer', 'bit', 'shade', 'neo', 'pixel', 'basement', 'vapor', 'retro', 'funky', 'bottts'];
@@ -124,12 +126,14 @@ const TABS = [
   { id: 'accessories', label: 'Accessories', icon: BellRing },
   { id: 'notifications', label: 'Notifications', icon: BellRing },
   { id: 'status', label: 'Status', icon: Circle },
+  { id: 'about', label: 'About', icon: Info },
 ];
 
 export function SettingsModal({ myProfile }: { myProfile?: any }) {
   const { showSettings, setShowSettings, notificationSettings, toggleNotificationSetting, reduceMotion } = useChatStore();
   const toast = useToast();
   const { refetchProfiles } = useAuth();
+  const { update: updateInfo, isChecking, isDownloading, downloadProgress, checkForUpdates, downloadAndInstall } = useUpdate();
   const [activeTab, setActiveTab] = useState('profile');
   const [editUsername, setEditUsername] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
@@ -137,6 +141,11 @@ export function SettingsModal({ myProfile }: { myProfile?: any }) {
   const [editEffect, setEditEffect] = useState<string>('none');
   const [editOverlay, setEditOverlay] = useState<string>('none');
   const [notifPermission, setNotifPermission] = useState(false);
+  const [appVersion, setAppVersion] = useState('1.0.0');
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (showSettings && myProfile) {
@@ -557,21 +566,107 @@ export function SettingsModal({ myProfile }: { myProfile?: any }) {
                 </div>
               </div>
             )}
+
+            {activeTab === 'about' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="text-center py-8">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-xl">
+                    <span className="text-3xl font-black text-white">B</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-1">The Basement</h2>
+                  <p className="text-sm text-zinc-500">Version {appVersion}</p>
+                </div>
+
+                <div className="bg-zinc-800/30 rounded-xl border border-white/5 p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <RefreshCw size={20} className="text-indigo-400" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">Auto Updates</h3>
+                      <p className="text-[10px] text-zinc-500">Download and install the latest version</p>
+                    </div>
+                  </div>
+
+                  {updateInfo ? (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <p className="text-sm text-emerald-400 font-medium">
+                          Update available: v{updateInfo.version}
+                        </p>
+                        {updateInfo.body && (
+                          <p className="text-xs text-zinc-400 mt-1">{updateInfo.body}</p>
+                        )}
+                      </div>
+                      
+                      {isDownloading ? (
+                        <div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-zinc-400">Downloading...</span>
+                            <span className="text-white">{downloadProgress}%</span>
+                          </div>
+                          <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
+                              style={{ width: `${downloadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={downloadAndInstall}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                        >
+                          <Download size={16} />
+                          Download & Install
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={checkForUpdates}
+                      disabled={isChecking}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white font-medium rounded-xl transition-all"
+                    >
+                      {isChecking ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={16} />
+                          Check for Updates
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                <div className="bg-zinc-800/30 rounded-xl border border-white/5 p-4">
+                  <h3 className="text-sm font-semibold text-white mb-2">About</h3>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    The Basement is a modern chat application built with Next.js and Tauri. 
+                    Connect with friends and colleagues in real-time.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-4 border-t border-white/5 bg-black/20 shrink-0">
             <div className="flex gap-3">
-              <button 
-                onClick={handleSave} 
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 p-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
-              >
-                <Save size={16} /> Save Changes
-              </button>
+              {activeTab !== 'about' && (
+                <button 
+                  onClick={handleSave} 
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 p-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
+                >
+                  <Save size={16} /> Save Changes
+                </button>
+              )}
               <button 
                 onClick={() => setShowSettings(false)} 
-                className="px-6 py-4 text-zinc-500 hover:text-white font-semibold text-sm uppercase tracking-wider transition-colors"
+                className={`px-6 py-4 text-zinc-500 hover:text-white font-semibold text-sm uppercase tracking-wider transition-colors ${activeTab === 'about' ? 'flex-1' : ''}`}
               >
-                Cancel
+                {activeTab === 'about' ? 'Close' : 'Cancel'}
               </button>
             </div>
           </div>

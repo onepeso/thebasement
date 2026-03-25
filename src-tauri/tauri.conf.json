@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "The Basement",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "identifier": "com.thebasement.app",
   "build": {
     "frontendDist": "../out",
@@ -39,6 +39,14 @@
     ],
     "windows": {
       "allowDowngrades": true
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/onepeso/thebasement/releases/latest/download/latest.json"
+      ]
     }
   }
 }
