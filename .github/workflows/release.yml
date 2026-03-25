@@ -28,7 +28,7 @@ jobs:
           node-version: 20
           cache: "pnpm"
 
-      # 3. Install Rust (FIXED LINE BELOW)
+      # 3. Install Rust
       - uses: dtolnay/rust-toolchain@stable
 
       # 4. Install System Dependencies (Ubuntu only)
@@ -46,6 +46,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # NEXT.JS NEEDS THESE TO NOT CRASH:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         with:
           tagName: v__VERSION__
           releaseName: "App v__VERSION__"

@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "The Basement",
   "version": "1.1.0",
-  "identifier": "com.thebasement.app",
+  "identifier": "com.thebasement.desktop",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
