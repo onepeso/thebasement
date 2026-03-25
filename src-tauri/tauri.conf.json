@@ -40,6 +40,8 @@
     "windows": {
       "allowDowngrades": true
     }
+    "createUpdaterArtifacts": true,
+    "identifier": "com.thebasement.desktop"
   },
   "plugins": {
     "updater": {
