@@ -11,6 +11,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useDirectMessages } from "@/hooks/useDirectMessages";
 import { useThreads } from "@/hooks/useThreads";
 import { useTyping } from "@/hooks/useTyping";
+import { useUpdate } from "@/hooks/useUpdate";
 import { useChatStore } from "@/store/useChatStore";
 import { ToastContainer, useToast } from "@/store/useToastStore";
 import { TitleBar } from "@/components/layout/TitleBar";
@@ -26,13 +27,14 @@ import { ThreadView } from "@/components/chat/ThreadView";
 import { SettingsModal } from "@/components/ui/SettingsModal";
 import { ProfileModal } from "@/components/ui/ProfileModal";
 import { ViewProfileModal } from "@/components/ui/ViewProfileModal";
+import { UpdateNotification } from "@/components/ui/UpdateNotification";
 import AuthScreen from "@/components/ui/AuthScreen";
 import { ChevronDown, ArrowDown, Sparkles, Hash, Search, X, MessageSquare, Menu } from "lucide-react";
 import type { DirectMessage, Message, Thread } from "@/types/database";
 
 export default function Home() {
   const { session, allProfiles, myProfile, loading: authLoading } = useAuth();
-  const { channels, activeChannel, layoutMode, lastReadTimestamp, searchQuery, isSearching, setChannels, setActiveChannel, setLayoutMode, updateLastReadToNow, setSearchQuery, setIsSearching, setReplyTo } = useChatStore();
+  const { channels, activeChannel, layoutMode, lastReadTimestamp, searchQuery, isSearching, setChannels, setActiveChannel, setLayoutMode, updateLastReadToNow, setSearchQuery, setIsSearching, setReplyTo, showUpdatePopup, dismissedUpdateVersion } = useChatStore();
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [reactingToMsg, setReactingToMsg] = useState<{id: string, username: string} | null>(null);
   const [showDM, setShowDM] = useState(false);
@@ -51,6 +53,21 @@ export default function Home() {
   const onlineUsers = usePresence(session?.user?.id);
   const { messages, receipts } = useChat(activeChannel?.id, session?.user?.id);
   const { typingUsers, startTyping, stopTyping } = useTyping(session?.user?.id, myProfile?.username);
+  const { update: updateInfo, checkForUpdates } = useUpdate();
+  
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  
+  useEffect(() => {
+    if (session && updateInfo && updateInfo.version !== dismissedUpdateVersion) {
+      useChatStore.getState().setShowUpdatePopup(true);
+    }
+  }, [session, updateInfo, dismissedUpdateVersion]);
+  
+  useEffect(() => {
+    if (session) {
+      checkForUpdates();
+    }
+  }, [session, checkForUpdates]);
   
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -651,6 +668,13 @@ export default function Home() {
           />
         )}
         <ViewProfileModal onlineUsers={onlineUsers} />
+        {showUpdatePopup && updateInfo && (
+          <UpdateNotification
+            version={updateInfo.version}
+            onUpdate={() => setShowUpdateModal(true)}
+          />
+        )}
+        {showUpdateModal && <SettingsModal myProfile={myProfile} />}
         <ToastContainer />
       </div>
     </div>

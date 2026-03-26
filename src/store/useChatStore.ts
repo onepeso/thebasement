@@ -61,6 +61,9 @@ interface ChatStore {
   replyTo: ReplyMessage | null;
   notificationSettings: NotificationSettings;
   
+  showUpdatePopup: boolean;
+  dismissedUpdateVersion: string | null;
+  
   setChannels: (channels: Channel[]) => void;
   setActiveChannel: (channel: Channel | null) => void;
   setLayoutMode: (mode: 'standard' | 'iphone') => void;
@@ -87,6 +90,9 @@ interface ChatStore {
   
   setNotificationSettings: (settings: NotificationSettings) => void;
   toggleNotificationSetting: (key: keyof NotificationSettings) => void;
+  
+  setShowUpdatePopup: (show: boolean) => void;
+  dismissUpdate: (version: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -111,6 +117,9 @@ export const useChatStore = create<ChatStore>()(
         directMessages: false,
         sound: true,
       },
+
+      showUpdatePopup: false,
+      dismissedUpdateVersion: null,
 
       setChannels: (channels) => set({ channels }),
       
@@ -216,6 +225,13 @@ export const useChatStore = create<ChatStore>()(
           [key]: !state.notificationSettings[key],
         },
       })),
+
+      setShowUpdatePopup: (show) => set({ showUpdatePopup: show }),
+      
+      dismissUpdate: (version) => set({ 
+        showUpdatePopup: false, 
+        dismissedUpdateVersion: version 
+      }),
     }),
     {
       name: 'thebasement-settings',
@@ -224,6 +240,7 @@ export const useChatStore = create<ChatStore>()(
         notificationSettings: state.notificationSettings,
         activeChannel: state.activeChannel,
         reduceMotion: state.reduceMotion,
+        dismissedUpdateVersion: state.dismissedUpdateVersion,
       }),
     }
   )
