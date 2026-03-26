@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useChatStore } from "@/store/useChatStore";
-import { LogOut, Hash, ChevronDown, MessageCircle, UserPlus, X, Search, MessageSquare, Settings } from "lucide-react";
+import { LogOut, Hash, ChevronDown, MessageCircle, UserPlus, X, Search, MessageSquare, Settings, Trash2 } from "lucide-react";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 import { cleanupPresence } from "@/hooks/usePresence";
 import type { UserStatus, DirectMessage, Thread } from "@/types/database";
@@ -16,6 +16,7 @@ interface SidebarProps {
   onStartDM?: (userId: string) => void;
   onSelectThread?: (thread: Thread) => void;
   onDeleteThread?: (threadId: string) => void;
+  onDeleteDM?: (dmId: string) => void;
   onOpenProfile?: () => void;
   activeDM?: DirectMessage | null;
   activeChannel?: any;
@@ -52,7 +53,7 @@ interface SidebarProps {
   onCloseMobileSidebar?: () => void;
 }
 
-export function Sidebar({ myProfile, conversations = [], allProfiles = [], onlineUsers = [], onSelectDM, onStartDM, onSelectThread, onDeleteThread, onOpenProfile, activeDM, activeChannel, onBackToChannels, userThreads = [], activeThreadId, showMobileSidebar, onCloseMobileSidebar }: SidebarProps) {
+export function Sidebar({ myProfile, conversations = [], allProfiles = [], onlineUsers = [], onSelectDM, onStartDM, onSelectThread, onDeleteThread, onDeleteDM, onOpenProfile, activeDM, activeChannel, onBackToChannels, userThreads = [], activeThreadId, showMobileSidebar, onCloseMobileSidebar }: SidebarProps) {
   const { channels, layoutMode, setActiveChannel, setLayoutMode } = useChatStore();
   const [showDMs, setShowDMs] = useState(false);
   const [showThreads, setShowThreads] = useState(false);
@@ -63,7 +64,7 @@ export function Sidebar({ myProfile, conversations = [], allProfiles = [], onlin
   
   useEffect(() => {
     setRenderKey(prev => prev + 1);
-  }, [allProfiles, onlineUsers]);
+  }, [allProfiles, onlineUsers, conversations]);
   
   const userStatus = (myProfile?.status || 'online') as UserStatus;
   const statusConfig = STATUS_CONFIG[userStatus];
@@ -304,29 +305,45 @@ export function Sidebar({ myProfile, conversations = [], allProfiles = [], onlin
             return (
               <div
                 key={`${dm.id}-${renderKey}`}
-                onClick={() => { onSelectDM?.(dm); onCloseMobileSidebar?.(); }}
                 className={`group flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-200 ${
                   isActive
                     ? "bg-indigo-600/30 text-indigo-300"
                     : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
                 }`}
               >
-                <AvatarWithEffect
-                  profile={dm.other_user}
-                  size="sm"
-                  isOnline={dmStatus === 'online'}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="truncate font-medium">{getDMUsername(dm)}</span>
+                <div 
+                  className="flex-1 min-w-0 flex items-center gap-2"
+                  onClick={() => { onSelectDM?.(dm); onCloseMobileSidebar?.(); }}
+                >
+                  <AvatarWithEffect
+                    profile={dm.other_user}
+                    size="sm"
+                    isOnline={dmStatus === 'online'}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="truncate font-medium">{getDMUsername(dm)}</span>
+                    </div>
+                    {dm.last_message && (
+                      <p className="text-[10px] text-zinc-600 truncate">
+                        {dm.last_message.sender_id === myProfile?.id ? 'You: ' : ''}
+                        {dm.last_message.text}
+                      </p>
+                    )}
                   </div>
-                  {dm.last_message && (
-                    <p className="text-[10px] text-zinc-600 truncate">
-                      {dm.last_message.sender_id === myProfile?.id ? 'You: ' : ''}
-                      {dm.last_message.text}
-                    </p>
-                  )}
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Delete conversation with ${getDMUsername(dm)}?`)) {
+                      onDeleteDM?.(dm.id);
+                    }
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all"
+                  title="Delete conversation"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             );
           })}

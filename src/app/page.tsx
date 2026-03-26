@@ -80,7 +80,7 @@ export default function Home() {
   const { reactions, toggleReaction } = useReactions(activeChannel?.id);
   const { pinMessage, unpinMessage, isPinned } = usePinnedMessages(activeChannel?.id);
   const { checkForMention, checkForNewMessage } = useNotifications(session?.user?.id, myProfile?.username);
-  const { conversations, messages: dmMessages, activeDM, setActiveDM, startConversation, sendMessage } = useDirectMessages(session?.user?.id);
+  const { conversations, messages: dmMessages, activeDM, setActiveDM, startConversation, sendMessage, deleteConversation } = useDirectMessages(session?.user?.id);
   const { threads, threadMessages, userThreads, createThread, addThreadMessage, fetchThreadMessages, fetchThread, fetchUserThreads, deleteThread } = useThreads();
   
   const handleSelectDM = (dm: DirectMessage) => {
@@ -90,9 +90,9 @@ export default function Home() {
   };
 
   const handleStartDM = async (userId: string) => {
+    setShowMobileSidebar(false);
     await startConversation(userId);
     setShowDM(true);
-    setShowMobileSidebar(false);
   };
 
   const handleBackToChannels = () => {
@@ -389,6 +389,7 @@ export default function Home() {
           onStartDM={handleStartDM}
           onSelectThread={handleSelectThread}
           onDeleteThread={handleDeleteThread}
+          onDeleteDM={deleteConversation}
           onOpenProfile={() => setShowProfile(true)}
           activeDM={activeDM}
           activeChannel={activeChannel}

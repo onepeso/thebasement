@@ -97,7 +97,17 @@ export function DMView({ dm, messages, currentUserId, onSendMessage, onBack, onl
     return (
       <div className="flex-1 flex items-center justify-center bg-zinc-900/30">
         <div className="text-center text-zinc-600">
-          <p className="text-sm"> Select a conversation</p>
+          <p className="text-sm">Select a conversation</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!otherUser) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-zinc-900/30">
+        <div className="text-center text-zinc-600">
+          <p className="text-sm">Loading conversation...</p>
         </div>
       </div>
     );
@@ -134,6 +144,11 @@ export function DMView({ dm, messages, currentUserId, onSendMessage, onBack, onl
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-zinc-600">
+            <p className="text-sm">Start a conversation with {otherUser?.username}</p>
+          </div>
+        )}
         <div className="flex flex-col gap-2">
           {messages.map((msg) => {
             const isMe = msg.sender_id === currentUserId;
