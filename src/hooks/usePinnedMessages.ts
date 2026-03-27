@@ -8,6 +8,8 @@ export function usePinnedMessages(channelId: string | undefined) {
   useEffect(() => {
     if (!channelId) return;
 
+    setPinnedMessages([]);
+
     const fetchPinnedMessages = async () => {
       const { data } = await supabase
         .from('pinned_messages')

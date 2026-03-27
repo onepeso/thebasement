@@ -121,7 +121,7 @@ export default function AuthScreen() {
     {
       icon: MessageSquare,
       title: 'Real-time Messaging',
-      description: 'Instant communication with typing indicators and read receipts',
+      description: 'Instant communication with typing indicators',
       color: 'indigo'
     },
     {

@@ -1,61 +1,97 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useChatStore } from '@/store/useChatStore';
+
+const MESSAGE_LIMIT = 50;
 
 export function useChat(channelId: string | undefined, userId: string | undefined) {
     const [messages, setMessages] = useState<any[]>([]);
-    const [receipts, setReceipts] = useState<any[]>([]);
+    const [hasMore, setHasMore] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    
+    const messageCache = useChatStore((state) => state.messageCache);
+    const setMessageCache = useChatStore((state) => state.setMessageCache);
+    const addMessagesToCache = useChatStore((state) => state.addMessagesToCache);
 
     useEffect(() => {
-        if (!channelId || !userId) return;
+        if (!channelId || !userId) {
+            setMessages([]);
+            setHasMore(false);
+            setLoading(false);
+            return;
+        }
 
-        const fetchInitialData = async () => {
-            const { data: msgData } = await supabase
-                .from('messages')
-                .select('*')
-                .eq('channel_id', channelId)
-                .order('created_at', { ascending: true });
-            
-            if (msgData) {
-                const replyMsgIds = msgData
-                    .filter((m: any) => m.reply_to_id)
-                    .map((m: any) => m.reply_to_id);
-                
-                const replyMessagesResult = replyMsgIds.length > 0 
-                    ? await supabase
-                        .from('messages')
-                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
-                        .in('id', replyMsgIds)
-                    : { data: [] };
-                
-                const replyMessagesMap = new Map((replyMessagesResult.data || []).map((m: any) => [m.id, m]));
-                
-                const [msgWithProfiles] = await Promise.all([
-                    supabase
-                        .from('messages')
-                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
-                        .eq('channel_id', channelId)
-                        .order('created_at', { ascending: true })
-                ]);
-                
-                const enrichedMessages = (msgWithProfiles.data || []).map((m: any) => ({
-                    ...m,
-                    reply_to: m.reply_to_id && replyMessagesMap.has(m.reply_to_id) ? {
-                        ...replyMessagesMap.get(m.reply_to_id),
-                        profiles: replyMessagesMap.get(m.reply_to_id)?.profiles
-                    } : null
-                }));
-                
-                setMessages(enrichedMessages);
+        const cached = messageCache[channelId];
+        if (cached && cached.messages.length > 0) {
+            setMessages(cached.messages);
+            setHasMore(cached.hasMore);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
+
+        const fetchData = async () => {
+            try {
+                let query = supabase
+                    .from('messages')
+                    .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                    .eq('channel_id', channelId)
+                    .order('created_at', { ascending: true })
+                    .limit(MESSAGE_LIMIT);
+
+                const { data: msgData } = await query;
+
+                if (msgData && msgData.length > 0) {
+                    const replyMsgIds = msgData
+                        .filter((m: any) => m.reply_to_id)
+                        .map((m: any) => m.reply_to_id);
+                    
+                    let replyMessagesMap = new Map();
+                    if (replyMsgIds.length > 0) {
+                        const replyMessagesResult = await supabase
+                            .from('messages')
+                            .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                            .in('id', replyMsgIds);
+                        
+                        if (replyMessagesResult.data) {
+                            replyMessagesMap = new Map(replyMessagesResult.data.map((m: any) => [m.id, m]));
+                        }
+                    }
+                    
+                    const enrichedMessages = msgData.map((m: any) => ({
+                        ...m,
+                        reply_to: m.reply_to_id && replyMessagesMap.has(m.reply_to_id) ? {
+                            ...replyMessagesMap.get(m.reply_to_id),
+                            profiles: replyMessagesMap.get(m.reply_to_id)?.profiles
+                        } : null
+                    }));
+                    
+                    setMessages(enrichedMessages);
+                    setHasMore(msgData.length === MESSAGE_LIMIT);
+                    setMessageCache(channelId, {
+                        messages: enrichedMessages,
+                        hasMore: msgData.length === MESSAGE_LIMIT,
+                        oldestMessageId: msgData[0]?.id || null
+                    });
+                } else {
+                    setMessages([]);
+                    setHasMore(false);
+                    setMessageCache(channelId, {
+                        messages: [],
+                        hasMore: false,
+                        oldestMessageId: null
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            } finally {
+                setLoading(false);
             }
-
-            const { data: recData } = await supabase
-                .from('read_receipts')
-                .select('*')
-                .eq('channel_id', channelId);
-            if (recData) setReceipts(recData);
         };
 
-        fetchInitialData();
+        fetchData();
 
         const msgSub = supabase.channel(`room:${channelId}`)
             .on('postgres_changes', { 
@@ -75,7 +111,9 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                         replyToData = replyMsg;
                     }
                     
-                    setMessages(prev => [...prev, { ...newMsg, profiles: prof, reply_to: replyToData }]);
+                    const enrichedMsg = { ...newMsg, profiles: prof, reply_to: replyToData };
+                    setMessages(prev => [...prev, enrichedMsg]);
+                    addMessagesToCache(channelId, [enrichedMsg]);
                 }
                 if (payload.eventType === 'UPDATE') {
                     const updatedMsg = JSON.parse(JSON.stringify(payload.new)) as any;
@@ -87,22 +125,85 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 }
             }).subscribe();
 
-        const receiptSub = supabase.channel(`receipts:${channelId}`)
-            .on('postgres_changes', { 
-                event: '*', schema: 'public', table: 'read_receipts', filter: `channel_id=eq.${channelId}` 
-            }, (payload) => {
-                const newReceipt = JSON.parse(JSON.stringify(payload.new)) as any;
-                setReceipts(prev => {
-                    const filtered = prev.filter(r => r.user_id !== newReceipt.user_id);
-                    return [...filtered, newReceipt];
-                });
-            }).subscribe();
-
         return () => {
             supabase.removeChannel(msgSub);
-            supabase.removeChannel(receiptSub);
         };
     }, [channelId, userId]);
 
-    return { messages, receipts };
+    const loadMore = useCallback(async () => {
+        if (!channelId || loadingMore || !hasMore) return;
+
+        setLoadingMore(true);
+        
+        try {
+            const oldestId = messageCache[channelId]?.oldestMessageId;
+            if (!oldestId) {
+                setHasMore(false);
+                return;
+            }
+
+            const { data: oldestMsg } = await supabase
+                .from('messages')
+                .select('created_at')
+                .eq('id', oldestId)
+                .single();
+            
+            if (!oldestMsg) {
+                setHasMore(false);
+                return;
+            }
+
+            const { data: msgData } = await supabase
+                .from('messages')
+                .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                .eq('channel_id', channelId)
+                .lt('created_at', oldestMsg.created_at)
+                .order('created_at', { ascending: true })
+                .limit(MESSAGE_LIMIT);
+
+            if (msgData && msgData.length > 0) {
+                const replyMsgIds = msgData
+                    .filter((m: any) => m.reply_to_id)
+                    .map((m: any) => m.reply_to_id);
+                
+                let replyMessagesMap = new Map();
+                if (replyMsgIds.length > 0) {
+                    const replyMessagesResult = await supabase
+                        .from('messages')
+                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                        .in('id', replyMsgIds);
+                    
+                    if (replyMessagesResult.data) {
+                        replyMessagesMap = new Map(replyMessagesResult.data.map((m: any) => [m.id, m]));
+                    }
+                }
+                
+                const enrichedMessages = msgData.map((m: any) => ({
+                    ...m,
+                    reply_to: m.reply_to_id && replyMessagesMap.has(m.reply_to_id) ? {
+                        ...replyMessagesMap.get(m.reply_to_id),
+                        profiles: replyMessagesMap.get(m.reply_to_id)?.profiles
+                    } : null
+                }));
+                
+                const existingMessages = messageCache[channelId]?.messages || [];
+                const newMessages = [...existingMessages, ...enrichedMessages];
+                setMessages(newMessages);
+                setMessageCache(channelId, {
+                    messages: newMessages,
+                    hasMore: msgData.length === MESSAGE_LIMIT,
+                    oldestMessageId: msgData[0]?.id
+                });
+                setHasMore(msgData.length === MESSAGE_LIMIT);
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Error loading more messages:', error);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [channelId, loadingMore, hasMore, messageCache, setMessageCache]);
+
+    return { messages, hasMore, loading, loadingMore, loadMore };
 }

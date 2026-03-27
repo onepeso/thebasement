@@ -5,6 +5,9 @@ interface Channel {
   id: string;
   name: string;
   slug: string;
+  description?: string;
+  created_by?: string;
+  is_official?: boolean;
   [key: string]: unknown;
 }
 
@@ -44,10 +47,25 @@ interface ViewProfile {
   avatar_overlays?: string;
 }
 
+interface UserProfile {
+  id: string;
+  username: string;
+  avatar_url?: string | null;
+  bio?: string | null;
+  status?: string | null;
+  avatar_effect?: string | null;
+  avatar_overlays?: string | null;
+  email?: string | null;
+}
+
 interface ChatStore {
   channels: Channel[];
   activeChannel: Channel | null;
-  layoutMode: 'standard' | 'iphone';
+  
+  // Persisted user profile for instant loading
+  userProfile: UserProfile | null;
+  setUserProfile: (profile: UserProfile | null) => void;
+  updateUserProfile: (updates: Partial<UserProfile>) => void;
   showSettings: boolean;
   viewProfile: ViewProfile | null;
   reduceMotion: boolean;
@@ -64,15 +82,24 @@ interface ChatStore {
   showUpdatePopup: boolean;
   dismissedUpdateVersion: string | null;
   
+  // Message cache
+  messageCache: Record<string, {
+    messages: any[];
+    hasMore: boolean;
+    oldestMessageId: string | null;
+  }>;
+  
   setChannels: (channels: Channel[]) => void;
   setActiveChannel: (channel: Channel | null) => void;
-  setLayoutMode: (mode: 'standard' | 'iphone') => void;
   setShowSettings: (show: boolean) => void;
   setViewProfile: (profile: ViewProfile | null) => void;
   setReduceMotion: (reduce: boolean) => void;
   setIsTabVisible: (visible: boolean) => void;
   setLastReadTimestamp: (timestamp: string) => void;
   updateLastReadToNow: () => void;
+  setMessageCache: (channelId: string, data: { messages: any[]; hasMore: boolean; oldestMessageId: string | null }) => void;
+  addMessagesToCache: (channelId: string, messages: any[], prepend?: boolean) => void;
+  clearMessageCache: (channelId: string) => void;
   
   setReactions: (messageId: string, reactions: Reaction[]) => void;
   addReaction: (messageId: string, emoji: string, userId: string) => void;
@@ -100,7 +127,6 @@ export const useChatStore = create<ChatStore>()(
     (set) => ({
       channels: [],
       activeChannel: null,
-      layoutMode: 'standard',
       showSettings: false,
       viewProfile: null,
       reduceMotion: false,
@@ -121,6 +147,16 @@ export const useChatStore = create<ChatStore>()(
       showUpdatePopup: false,
       dismissedUpdateVersion: null,
 
+      // Message cache
+      messageCache: {},
+
+      // User profile for instant loading
+      userProfile: null,
+      setUserProfile: (profile) => set({ userProfile: profile }),
+      updateUserProfile: (updates) => set((state) => ({
+        userProfile: state.userProfile ? { ...state.userProfile, ...updates } : null
+      })),
+
       setChannels: (channels) => set({ channels }),
       
       setActiveChannel: (channel) => set({ 
@@ -130,10 +166,7 @@ export const useChatStore = create<ChatStore>()(
         searchQuery: '',
         isSearching: false,
         reactions: {},
-        pinnedMessages: [],
       }),
-      
-      setLayoutMode: (mode) => set({ layoutMode: mode }),
       
       setShowSettings: (show) => set({ showSettings: show }),
       
@@ -232,15 +265,46 @@ export const useChatStore = create<ChatStore>()(
         showUpdatePopup: false, 
         dismissedUpdateVersion: version 
       }),
+      
+      setMessageCache: (channelId, data) => set((state) => ({
+        messageCache: {
+          ...state.messageCache,
+          [channelId]: data,
+        },
+      })),
+      
+      addMessagesToCache: (channelId, messages, prepend = false) => set((state) => {
+        const existing = state.messageCache[channelId] || { messages: [], hasMore: true, oldestMessageId: null };
+        const newMessages = prepend 
+          ? [...messages, ...existing.messages]
+          : [...existing.messages, ...messages];
+        return {
+          messageCache: {
+            ...state.messageCache,
+            [channelId]: {
+              ...existing,
+              messages: newMessages,
+              oldestMessageId: messages.length > 0 && prepend 
+                ? messages[0].id 
+                : existing.oldestMessageId,
+            },
+          },
+        };
+      }),
+      
+      clearMessageCache: (channelId) => set((state) => {
+        const { [channelId]: _, ...rest } = state.messageCache;
+        return { messageCache: rest };
+      }),
     }),
     {
       name: 'thebasement-settings',
       partialize: (state) => ({ 
-        layoutMode: state.layoutMode,
         notificationSettings: state.notificationSettings,
         activeChannel: state.activeChannel,
         reduceMotion: state.reduceMotion,
         dismissedUpdateVersion: state.dismissedUpdateVersion,
+        userProfile: state.userProfile,
       }),
     }
   )

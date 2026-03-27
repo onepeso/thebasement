@@ -1,25 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { supabase } from "@/lib/supabase";
 import { Send, AtSign, X } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { useToast } from "@/store/useToastStore";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 
-export function MessageInput({
-  channelId,
-  userId,
-  allProfiles,
-  username,
-  onTyping,
-  onStopTyping,
-}: {
+export const MessageInput = forwardRef<{ focus: () => void }, {
   channelId: string;
   userId: string;
   allProfiles: any[];
   username: string;
   onTyping?: () => void;
   onStopTyping?: () => void;
-}) {
+}>(function MessageInput({
+  channelId,
+  userId,
+  allProfiles,
+  username,
+  onTyping,
+  onStopTyping,
+}, ref) {
   const [input, setInput] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
@@ -27,6 +27,11 @@ export function MessageInput({
   const toast = useToast();
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingRef = useRef<number>(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
 
   useEffect(() => {
     return () => {
@@ -35,6 +40,16 @@ export function MessageInput({
       }
     };
   }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form) {
+        form.requestSubmit();
+      }
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -160,9 +175,11 @@ export function MessageInput({
       <div className="bg-zinc-800/50 rounded-2xl px-4 py-3 border border-white/5 focus-within:border-indigo-500/50 focus-within:bg-zinc-800/70 transition-all shadow-inner">
         <div className="flex items-center gap-3">
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             className="flex-1 bg-transparent w-full outline-none text-sm text-zinc-100 placeholder-zinc-600"
           />
@@ -177,4 +194,4 @@ export function MessageInput({
       </div>
     </form>
   );
-}
+});

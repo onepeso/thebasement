@@ -73,9 +73,8 @@ export function AvatarWithEffect({ profile, username, size = 'md', className = '
   const overlay = profile?.avatar_overlays;
   const storedStatus = profile?.status as string | undefined;
   
-  const actualIsOnline = isOnline === undefined ? true : isOnline;
-  const status = actualIsOnline 
-    ? (storedStatus && storedStatus !== 'offline' ? storedStatus : 'online')
+  const status = isOnline 
+    ? (storedStatus || 'online')
     : 'offline';
 
   useEffect(() => {

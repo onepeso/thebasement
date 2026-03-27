@@ -1,6 +1,6 @@
-import { memo, useState, useMemo } from "react";
+import { memo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Check, CheckCheck, Pencil, Trash2, Smile, Pin, PinOff, Reply, MessageSquare } from "lucide-react";
+import { Pencil, Trash2, Smile, Pin, PinOff, Reply } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 
@@ -8,9 +8,7 @@ function MessageItemInner({
   msg,
   isMe,
   onDelete,
-  receipts,
   showNewDivider,
-  layoutMode,
   isGrouped,
   reactions,
   onToggleReaction,
@@ -21,21 +19,11 @@ function MessageItemInner({
   onReply,
   searchQuery,
   myUsername,
-  thread,
-  isThreadRoot,
-  onOpenThread,
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
-  const isIphone = layoutMode === "iphone";
   
   const isMentioned = myUsername && !isMe && msg.text.includes(`@${myUsername}`);
-
-  const isReadByOthers = useMemo(() => receipts?.some(
-    (r: any) =>
-      r.user_id !== msg.user_id &&
-      new Date(r.last_read_at) >= new Date(msg.created_at),
-  ), [receipts, msg.user_id, msg.created_at]);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], {
@@ -91,60 +79,38 @@ function MessageItemInner({
       <div
         className={`relative flex items-start transition-all duration-200 ${
           isMentioned
-            ? isIphone
-              ? `px-4 ${isMe ? "flex-row-reverse" : "flex-row"} ${isGrouped ? "mt-0.5" : "mt-6"} bg-gradient-to-r from-indigo-500/[0.03] to-transparent`
-              : `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} bg-gradient-to-r from-indigo-500/[0.03] to-transparent`
-            : isIphone
-            ? `px-4 ${isMe ? "flex-row-reverse" : "flex-row"} ${isGrouped ? "mt-0.5" : "mt-6"}`
+            ? `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} bg-gradient-to-r from-indigo-500/[0.03] to-transparent`
             : `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} hover:bg-white/[0.02]`
         }`}
       >
-        <div
-          className={`shrink-0 flex justify-center ${isIphone ? (isMe ? "ml-2.5" : "mr-2.5") + " mt-0.5" : "mr-4 w-10"}`}
-        >
+        <div className="shrink-0 flex justify-center mr-4 w-10">
           {!isGrouped ? (
             <AvatarWithEffect
               profile={msg.profiles}
-              size={isIphone ? "sm" : "lg"}
+              size="lg"
               showStatus={false}
               onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
             />
           ) : (
-            <div className={isIphone ? "w-8" : "w-10"} />
+            <div className="w-10" />
           )}
         </div>
 
-        <div
-          className={`flex flex-col min-w-0 flex-1 ${isIphone ? (isMe ? "items-end" : "items-start") : ""}`}
-        >
+        <div className="flex flex-col min-w-0 flex-1">
           {!isGrouped && (
-            <div
-              className={`flex items-center gap-2 mb-1 group/name ${isIphone && isMe ? "flex-row-reverse space-x-reverse" : ""}`}
-            >
+            <div className="flex items-center gap-2 mb-1 group/name">
               <span
-                className={`font-semibold tracking-tight cursor-pointer hover:underline ${isIphone ? "text-[11px] text-zinc-500" : isMe ? "text-emerald-400 text-[13px]" : "text-indigo-400 text-[13px]"}`}
+                className={`font-semibold tracking-tight cursor-pointer hover:underline ${isMe ? "text-emerald-400 text-[13px]" : "text-indigo-400 text-[13px]"}`}
                 title={formatFullDate(msg.created_at)}
                 onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
               >
                 {msg.profiles?.username}
               </span>
-              <span className="text-[9px] font-medium text-zinc-600 uppercase tabular-nums" title={formatFullDate(msg.created_at)}>
-                {formatTime(msg.created_at)}
-              </span>
-              {isMe && !isIphone && (
-                <div className={`flex items-center gap-2 transition-opacity duration-500 ${isReadByOthers ? "opacity-100" : "opacity-30"}`}>
-                  {isReadByOthers ? (
-                    <CheckCheck size={11} className="text-emerald-400" />
-                  ) : (
-                    <Check size={11} className="text-zinc-500" />
-                  )}
-                </div>
-              )}
             </div>
           )}
 
           <div className="flex items-start gap-2">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               {msg.reply_to_id && msg.reply_to && (
                 <div className="mb-2 relative pl-3 py-1.5 border-l-2 border-indigo-500/60 bg-gradient-to-r from-indigo-500/5 to-transparent rounded-r-md">
                   <div className="flex items-center gap-2 mb-0.5">
@@ -165,13 +131,7 @@ function MessageItemInner({
 
               <div
                 className={`group/bubble relative ${
-                  isIphone
-                    ? `px-4 py-2.5 rounded-2xl shadow-lg border border-white/5 ${
-                        isMe
-                          ? "bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-indigo-500/20"
-                          : "bg-zinc-800/90 text-zinc-100 shadow-black/20"
-                      } ${isMe ? "rounded-tr-sm" : "rounded-tl-sm"}`
-                    : isEditing
+                  isEditing
                     ? "px-4 py-3 bg-zinc-800/90 border border-white/10 rounded-lg text-[14px] leading-relaxed text-zinc-300"
                     : "text-[14px] leading-relaxed text-zinc-300"
                 }`}
@@ -204,25 +164,6 @@ function MessageItemInner({
                     {highlightText(msg.text, searchQuery)}
                   </span>
                 )}
-
-                {isIphone && (
-                  <div
-                    className={`flex items-center mt-1.5 gap-1.5 ${isMe ? "justify-end" : "justify-start"}`}
-                  >
-                    <span className="text-[8px] font-medium text-zinc-400/60 uppercase tabular-nums">
-                      {formatTime(msg.created_at)}
-                    </span>
-                    {isMe && (
-                      <div className={`transition-opacity duration-500 ${isReadByOthers ? "opacity-100" : "opacity-30"}`}>
-                        {isReadByOthers ? (
-                          <CheckCheck size={12} className="text-emerald-400" />
-                        ) : (
-                          <Check size={12} className="text-zinc-400" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {reactions && reactions.length > 0 && (
@@ -245,7 +186,7 @@ function MessageItemInner({
               )}
             </div>
 
-              {(isMe || (!isMe && !isIphone)) && !isEditing && (
+            {!isEditing && (
               <div className="relative flex flex-row items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
                 <button
                   onClick={() => onReactionClick && onReactionClick(msg)}
@@ -272,21 +213,6 @@ function MessageItemInner({
                 >
                   {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
                 </button>
-                <button
-                  onClick={() => onOpenThread && onOpenThread(msg)}
-                  className="relative p-1.5 rounded-lg transition-all"
-                  title={thread ? 'View thread' : 'Start thread'}
-                >
-                  <MessageSquare 
-                    size={14} 
-                    className={thread ? 'text-emerald-400' : 'text-zinc-600 group-hover:text-emerald-400'} 
-                  />
-                  {thread && (
-                    <span className={`absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center ${thread.reply_count > 0 ? 'bg-emerald-500' : 'bg-zinc-600'} text-white text-[10px] font-bold rounded-full shadow-sm`}>
-                      {thread.reply_count > 99 ? '99+' : thread.reply_count}
-                    </span>
-                  )}
-                </button>
                 {isMe && (
                   <>
                     <button
@@ -308,6 +234,9 @@ function MessageItemInner({
               </div>
             )}
 
+            <span className="text-[9px] font-medium text-zinc-600/30 uppercase tabular-nums shrink-0 self-center ml-2" title={formatFullDate(msg.created_at)}>
+              {formatTime(msg.created_at)}
+            </span>
           </div>
         </div>
       </div>

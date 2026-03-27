@@ -130,9 +130,9 @@ const TABS = [
 ];
 
 export function SettingsModal({ myProfile }: { myProfile?: any }) {
-  const { showSettings, setShowSettings, notificationSettings, toggleNotificationSetting, reduceMotion } = useChatStore();
+  const { showSettings, setShowSettings, notificationSettings, toggleNotificationSetting, reduceMotion, updateUserProfile } = useChatStore();
   const toast = useToast();
-  const { refetchProfiles } = useAuth();
+  const { session, refetchProfiles, updateProfile } = useAuth();
   const { update: updateInfo, isChecking, isDownloading, downloadProgress, checkForUpdates, downloadAndInstall } = useUpdate();
   const [activeTab, setActiveTab] = useState('profile');
   const [editUsername, setEditUsername] = useState('');
@@ -181,21 +181,25 @@ export function SettingsModal({ myProfile }: { myProfile?: any }) {
   if (!showSettings) return null;
 
   const handleSave = async () => {
+    const updates = { 
+      username: editUsername, 
+      avatar_url: editAvatar, 
+      status: editStatus, 
+      avatar_effect: editEffect === 'none' ? null : editEffect,
+      avatar_overlays: editOverlay === 'none' ? null : editOverlay,
+    };
+    
+    // Update local state immediately for instant feedback
+    updateUserProfile(updates);
+    updateProfile(session?.user?.id, updates);
+    
     const { error } = await supabase
       .from('profiles')
-      .update({ 
-        username: editUsername, 
-        avatar_url: editAvatar, 
-        status: editStatus, 
-        avatar_effect: editEffect === 'none' ? null : editEffect,
-        avatar_overlays: editOverlay === 'none' ? null : editOverlay,
-      })
+      .update(updates)
       .eq('id', myProfile.id);
     
     if (!error) {
-      await refetchProfiles();
       toast.success('Settings saved successfully');
-      setShowSettings(false);
     } else {
       toast.error('Failed to save settings');
     }
@@ -292,10 +296,10 @@ export function SettingsModal({ myProfile }: { myProfile?: any }) {
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in"
       onClick={(e) => e.target === e.currentTarget && setShowSettings(false)}
     >
-      <div className="relative w-full max-w-2xl animate-scale-in max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-2xl h-[600px] animate-scale-in flex flex-col">
         <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-indigo-500/20 rounded-3xl blur-xl" />
         
-        <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl text-white overflow-hidden flex flex-col">
+        <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl text-white overflow-hidden flex flex-col h-full">
           <div className="flex items-center justify-between p-4 border-b border-white/5 shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-indigo-600/20 rounded-xl">
@@ -664,9 +668,9 @@ export function SettingsModal({ myProfile }: { myProfile?: any }) {
               )}
               <button 
                 onClick={() => setShowSettings(false)} 
-                className={`px-6 py-4 text-zinc-500 hover:text-white font-semibold text-sm uppercase tracking-wider transition-colors ${activeTab === 'about' ? 'flex-1' : ''}`}
+                className={`px-6 py-4 text-zinc-400 hover:text-white font-semibold text-sm uppercase tracking-wider transition-colors ${activeTab === 'about' ? 'flex-1' : 'bg-zinc-800/50 border border-white/10 hover:border-white/20 rounded-xl'}`}
               >
-                {activeTab === 'about' ? 'Close' : 'Cancel'}
+                {activeTab === 'about' ? 'Close' : 'Done'}
               </button>
             </div>
           </div>
