@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { supabase } from "@/lib/supabase";
-import { Send, AtSign, X } from "lucide-react";
+import { Send, AtSign, X, Clock } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { useToast } from "@/store/useToastStore";
+import { useSpamProtection } from "@/hooks/useSpamProtection";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 
 export const MessageInput = forwardRef<{ focus: () => void }, {
@@ -12,6 +13,9 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
   username: string;
   onTyping?: () => void;
   onStopTyping?: () => void;
+  onMessageSent?: () => void;
+  onReplySent?: () => void;
+  onMentionSent?: () => void;
 }>(function MessageInput({
   channelId,
   userId,
@@ -19,9 +23,14 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
   username,
   onTyping,
   onStopTyping,
+  onMessageSent,
+  onReplySent,
+  onMentionSent,
 }, ref) {
   const [input, setInput] = useState("");
   const [showMentions, setShowMentions] = useState(false);
+  
+  const { isRateLimited, cooldownSeconds, canSendMessage, recordMessage } = useSpamProtection();
   const [mentionSearch, setMentionSearch] = useState("");
   const { replyTo, clearReplyTo } = useChatStore();
   const toast = useToast();
@@ -87,6 +96,10 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !channelId || !userId) return;
+    
+    if (!canSendMessage()) {
+      return; // Toast already shown by useSpamProtection
+    }
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -110,8 +123,17 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
       console.error("Insert Error:", error);
       toast.error("Failed to send message");
     } else {
+      recordMessage();
       setInput("");
       clearReplyTo();
+      
+      onMessageSent?.();
+      if (replyTo?.id) {
+        onReplySent?.();
+      }
+      if (input.includes('@')) {
+        onMentionSent?.();
+      }
     }
   };
 
@@ -144,31 +166,33 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
       )}
 
       {replyTo && (
-        <div className="mb-3 mx-4 relative pl-4 py-2.5 pr-3 bg-gradient-to-r from-indigo-500/10 via-indigo-500/5 to-transparent border-l-2 border-indigo-500/60 rounded-r-lg">
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                  </svg>
-                </div>
-                <span className="text-[11px] font-bold text-indigo-400 tracking-wide">
-                  Replying to {replyTo.username}
-                </span>
-              </div>
-              <p className="text-sm text-zinc-400/80 line-clamp-2 leading-relaxed pl-7">
-                {replyTo.text}
-              </p>
+        <div className="mb-2 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl animate-fade-in">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
             </div>
-            <button
-              type="button"
-              onClick={clearReplyTo}
-              className="shrink-0 p-1.5 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X size={14} />
-            </button>
+            <p className="text-sm text-zinc-400/80 line-clamp-2 leading-relaxed pl-7">
+              {replyTo.text}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={clearReplyTo}
+            className="shrink-0 p-1.5 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {isRateLimited && (
+        <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center gap-2 animate-fade-in">
+          <Clock size={14} className="text-red-400" />
+          <span className="text-xs font-medium text-red-400">
+            Slow down! You can send again in {cooldownSeconds} seconds
+          </span>
         </div>
       )}
 

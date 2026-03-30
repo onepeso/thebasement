@@ -7,9 +7,10 @@ import { X, Hash } from "lucide-react";
 interface CreateChannelModalProps {
   userId: string;
   onClose: () => void;
+  onChannelCreated?: () => void;
 }
 
-export function CreateChannelModal({ userId, onClose }: CreateChannelModalProps) {
+export function CreateChannelModal({ userId, onClose, onChannelCreated }: CreateChannelModalProps) {
   const { channels, setChannels, setActiveChannel } = useChatStore();
   const toast = useToast();
   const [name, setName] = useState("");
@@ -56,6 +57,7 @@ export function CreateChannelModal({ userId, onClose }: CreateChannelModalProps)
     setChannels(updatedChannels);
     setActiveChannel(data);
     toast.success("Channel created!");
+    onChannelCreated?.();
     onClose();
   };
 

@@ -33,3 +33,38 @@ export interface Channel {
   name: string;
   slug: string;
 }
+
+export type ChallengeType = 
+  | 'login_streak'
+  | 'first_message'
+  | 'send_messages'
+  | 'reactions_given'
+  | 'pins_created'
+  | 'replies_sent'
+  | 'mentions_sent'
+  | 'channels_created'
+  | 'reactions_received';
+
+export interface Challenge {
+  id: string;
+  type: ChallengeType;
+  title: string;
+  description: string;
+  goal: number;
+  xp_reward: number;
+  icon: string;
+}
+
+export interface UserChallenge {
+  id: string;
+  user_id: string;
+  challenge_id: string;
+  progress: number;
+  completed: boolean;
+  completed_at?: string;
+  challenge?: Challenge;
+}
+
+export interface UserChallengeWithChallenge extends UserChallenge {
+  challenge: Challenge;
+}

@@ -10,6 +10,7 @@ import { usePinnedMessages } from "@/hooks/usePinnedMessages";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTyping } from "@/hooks/useTyping";
 import { useUpdate } from "@/hooks/useUpdate";
+import { useChallenges } from "@/hooks/useChallenges";
 import { useChatStore } from "@/store/useChatStore";
 import { ToastContainer, useToast } from "@/store/useToastStore";
 import { TitleBar } from "@/components/layout/TitleBar";
@@ -28,8 +29,10 @@ import { EditChannelModal } from "@/components/ui/EditChannelModal";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { CommandPalette, useKeyboardShortcuts } from "@/components/ui/CommandPalette";
 import { KeyboardShortcutsModal } from "@/components/ui/KeyboardShortcutsModal";
+import { ChallengesModal } from "@/components/ui/ChallengesModal";
+import { ChallengeCompletedToast } from "@/components/ui/ChallengeCompletedToast";
 import AuthScreen from "@/components/ui/AuthScreen";
-import { ChevronDown, ArrowDown, Hash, Search, X, Menu, Command } from "lucide-react";
+import { ChevronDown, ArrowDown, Hash, Search, X, Menu, Command, Trophy } from "lucide-react";
 
 export default function Home() {
   const { session, allProfiles, myProfile, loading: authLoading } = useAuth();
@@ -41,6 +44,7 @@ export default function Home() {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showChallenges, setShowChallenges] = useState(false);
   const [editingChannel, setEditingChannel] = useState<any>(null);
   const { confirm: showConfirm, ConfirmComponent: ConfirmModalComponent, config: confirmConfig, close: closeConfirm } = useConfirm();
   const toast = useToast();
@@ -57,6 +61,23 @@ export default function Home() {
   const { messages, hasMore, loading, loadingMore, loadMore } = useChat(activeChannel?.id, session?.user?.id);
   const { typingUsers, startTyping, stopTyping } = useTyping(session?.user?.id, myProfile?.username);
   const { update: updateInfo, checkForUpdates } = useUpdate();
+  
+  const { 
+    challenges, 
+    totalXP, 
+    trackLogin, 
+    trackMessage, 
+    trackReaction, 
+    trackPin, 
+    trackReply, 
+    trackMention,
+    trackChannelCreated,
+    newCompletedChallenge,
+    clearNewCompleted,
+    loading: challengesLoading 
+  } = useChallenges(session?.user?.id);
+  
+  const completedCount = challenges.filter((c: any) => c.completed).length;
   
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
@@ -90,8 +111,9 @@ export default function Home() {
   useEffect(() => {
     if (session) {
       checkForUpdates();
+      trackLogin();
     }
-  }, [session, checkForUpdates]);
+  }, [session, checkForUpdates, trackLogin]);
   
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -209,6 +231,7 @@ export default function Home() {
 
   const handlePin = async (msgId: string) => {
     await pinMessage(msgId, session?.user?.id || '');
+    trackPin();
     toast.success('Message pinned');
   };
 
@@ -224,6 +247,7 @@ export default function Home() {
   const handleToggleReaction = (msgId: string, emoji: string) => {
     if (session?.user?.id) {
       toggleReaction(msgId, emoji, session.user.id);
+      trackReaction();
     }
   };
 
@@ -310,58 +334,62 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="relative">
-                <button
-                  onClick={() => setIsSearching(!isSearching)}
-                  className={`p-2.5 rounded-xl transition-all ${isSearching ? 'bg-indigo-600 text-white' : 'bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white'}`}
-                >
-                  <Search size={16} />
-                </button>
-                <button
-                  onClick={() => setShowShortcuts(true)}
-                  className="p-2.5 rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white transition-all"
-                  title="Keyboard shortcuts"
-                >
-                  <Command size={16} />
-                </button>
-                <button
-                  onClick={() => setShowCommandPalette(true)}
-                  className="p-2.5 rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white transition-all"
-                  title="Command palette (Ctrl+K)"
-                >
-                  <kbd className="text-[10px] font-bold">⌘K</kbd>
-                </button>
-                {isSearching && (
-                  <div className="absolute right-0 top-12 w-72 animate-scale-in">
-                    <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-3">
-                      <div className="flex items-center gap-2">
-                        <Search size={14} className="text-zinc-500" />
-                        <input
-                          ref={searchInputRef}
-                          type="text"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search messages..."
-                          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-zinc-600"
-                          autoFocus
-                        />
-                        {searchQuery && (
-                          <button onClick={() => setSearchQuery('')} className="text-zinc-500 hover:text-white">
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                      {searchQuery && (
-                        <div className="mt-2 text-[10px] text-zinc-500 uppercase tracking-wider">
-                          {messages.filter(m => m.text.toLowerCase().includes(searchQuery.toLowerCase())).length} result{messages.filter(m => m.text.toLowerCase().includes(searchQuery.toLowerCase())).length !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsSearching(!isSearching)}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${isSearching ? 'bg-indigo-600 text-white' : 'bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+              >
+                <Search size={16} />
+              </button>
+              <button
+                onClick={() => setShowShortcuts(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
+                title="Keyboard shortcuts"
+              >
+                <Command size={16} />
+              </button>
+              <button
+                onClick={() => setShowChallenges(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all relative"
+                title="Challenges"
+              >
+                <Trophy size={16} />
+                {completedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center">
+                    {completedCount}
+                  </span>
                 )}
-              </div>
-
+              </button>
+              <button
+                onClick={() => setShowCommandPalette(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
+                title="Command palette (Ctrl+K)"
+              >
+                <kbd className="text-[10px] font-bold">⌘K</kbd>
+              </button>
+              {isSearching && (
+                <div className="absolute right-0 top-12 w-72 animate-scale-in">
+                  <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-3">
+                    <div className="flex items-center gap-2">
+                      <Search size={14} className="text-zinc-500" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search messages..."
+                        className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-zinc-600"
+                        autoFocus
+                      />
+                    </div>
+                    {searchQuery && (
+                      <div className="mt-2 text-[10px] text-zinc-500 uppercase tracking-wider">
+                        {messages.filter(m => m.text.toLowerCase().includes(searchQuery.toLowerCase())).length} result{messages.filter(m => m.text.toLowerCase().includes(searchQuery.toLowerCase())).length !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </header>
 
@@ -524,6 +552,9 @@ export default function Home() {
                   username={myProfile.username}
                   onTyping={() => startTyping(activeChannel.id)}
                   onStopTyping={() => stopTyping(activeChannel.id)}
+                  onMessageSent={trackMessage}
+                  onReplySent={trackReply}
+                  onMentionSent={trackMention}
                 />
               </>
             )}
@@ -561,6 +592,8 @@ export default function Home() {
           <ProfileModal 
             profile={myProfile} 
             onlineUsers={onlineUsers}
+            challenges={challenges}
+            totalXP={totalXP}
             onClose={() => setShowProfile(false)} 
           />
         )}
@@ -575,7 +608,8 @@ export default function Home() {
         {showCreateChannel && session?.user && (
           <CreateChannelModal 
             userId={session.user.id} 
-            onClose={() => setShowCreateChannel(false)} 
+            onClose={() => setShowCreateChannel(false)}
+            onChannelCreated={trackChannelCreated}
           />
         )}
         {editingChannel && session?.user && (
@@ -623,6 +657,16 @@ export default function Home() {
         <KeyboardShortcutsModal
           open={showShortcuts}
           onClose={() => setShowShortcuts(false)}
+        />
+        <ChallengesModal
+          open={showChallenges}
+          onClose={() => setShowChallenges(false)}
+          challenges={challenges}
+          totalXP={totalXP}
+        />
+        <ChallengeCompletedToast
+          challenge={newCompletedChallenge}
+          onClose={clearNewCompleted}
         />
       </div>
     </div>
