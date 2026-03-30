@@ -8,6 +8,7 @@ import type { UserStatus } from "@/types/database";
 interface LeftSidebarProps {
   myProfile?: any;
   allProfiles?: any[];
+  onlineUsers?: string[];
   onOpenProfile?: () => void;
   activeChannel?: any;
   isMobile?: boolean;
@@ -24,9 +25,13 @@ const STATUS_CONFIG: Record<UserStatus, { dot: string; label: string; text: stri
   offline: { dot: 'bg-zinc-600', label: 'Offline', text: 'text-zinc-600' },
 };
 
-export function LeftSidebar({ myProfile, allProfiles, onOpenProfile, activeChannel, isMobile, onClose, onCreateChannel, onEditChannel }: LeftSidebarProps) {
+export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile, activeChannel, isMobile, onClose, onCreateChannel, onEditChannel }: LeftSidebarProps) {
   const { channels, setActiveChannel } = useChatStore();
   
+  const allOnlineUsers = myProfile?.id && onlineUsers 
+    ? [...new Set([myProfile.id, ...onlineUsers])] 
+    : onlineUsers || [];
+  const isOnline = myProfile?.id ? allOnlineUsers.includes(myProfile.id) : false;
   const userStatus = (myProfile?.status || 'online') as UserStatus;
   const statusConfig = STATUS_CONFIG[userStatus];
   const isAdmin = myProfile?.is_admin || false;
@@ -179,7 +184,7 @@ export function LeftSidebar({ myProfile, allProfiles, onOpenProfile, activeChann
             onClick={onOpenProfile}
             className="flex items-center gap-3 min-w-0 hover:opacity-80 transition-opacity flex-1"
           >
-            <AvatarWithEffect profile={myProfile} size="md" showStatus={true} />
+            <AvatarWithEffect profile={myProfile} size="md" showStatus={true} isOnline={isOnline} />
             <div className="min-w-0 text-left">
               <div className="text-sm font-bold truncate text-zinc-200">
                 {myProfile?.username}

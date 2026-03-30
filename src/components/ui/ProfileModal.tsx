@@ -15,12 +15,15 @@ const STATUS_OPTIONS: { value: UserStatus; label: string; color: string }[] = [
 
 interface ProfileModalProps {
   profile: any;
+  onlineUsers?: string[];
   onClose: () => void;
 }
 
-export function ProfileModal({ profile, onClose }: ProfileModalProps) {
+export function ProfileModal({ profile, onlineUsers, onClose }: ProfileModalProps) {
   const { setShowSettings } = useChatStore();
   const { refetchProfiles } = useAuth();
+  
+  const isOnline = profile?.id ? (onlineUsers?.includes(profile.id) ?? true) : false;
   const [username, setUsername] = useState(profile?.username || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [status, setStatus] = useState<UserStatus>(profile?.status || 'online');
@@ -81,6 +84,7 @@ export function ProfileModal({ profile, onClose }: ProfileModalProps) {
                 username={username}
                 size="xl"
                 showStatus={true}
+                isOnline={isOnline}
                 className="group-hover:opacity-80 transition-opacity"
               />
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

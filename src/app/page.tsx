@@ -22,6 +22,7 @@ import { SettingsModal } from "@/components/ui/SettingsModal";
 import { ProfileModal } from "@/components/ui/ProfileModal";
 import { ViewProfileModal } from "@/components/ui/ViewProfileModal";
 import { UpdateNotification } from "@/components/ui/UpdateNotification";
+import { UpdateModal } from "@/components/ui/UpdateModal";
 import { CreateChannelModal } from "@/components/ui/CreateChannelModal";
 import { EditChannelModal } from "@/components/ui/EditChannelModal";
 import { useConfirm } from "@/components/ui/ConfirmModal";
@@ -269,7 +270,8 @@ export default function Home() {
         <div className="hidden lg:block">
           <LeftSidebar 
             myProfile={myProfile}
-            allProfiles={allProfiles} 
+            allProfiles={allProfiles}
+            onlineUsers={onlineUsers} 
             onOpenProfile={() => setShowProfile(true)}
             activeChannel={activeChannel}
             onCreateChannel={() => setShowCreateChannel(true)}
@@ -542,7 +544,8 @@ export default function Home() {
             />
             <LeftSidebar 
               myProfile={myProfile}
-              allProfiles={allProfiles} 
+              allProfiles={allProfiles}
+              onlineUsers={onlineUsers} 
               onOpenProfile={() => { setShowMobileSidebar(false); setShowProfile(true); }}
               activeChannel={activeChannel}
               isMobile={true}
@@ -557,6 +560,7 @@ export default function Home() {
         {showProfile && myProfile && (
           <ProfileModal 
             profile={myProfile} 
+            onlineUsers={onlineUsers}
             onClose={() => setShowProfile(false)} 
           />
         )}
@@ -567,7 +571,7 @@ export default function Home() {
             onUpdate={() => setShowUpdateModal(true)}
           />
         )}
-        {showUpdateModal && <SettingsModal myProfile={myProfile} />}
+        {showUpdateModal && <UpdateModal onClose={() => setShowUpdateModal(false)} />}
         {showCreateChannel && session?.user && (
           <CreateChannelModal 
             userId={session.user.id} 

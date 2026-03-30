@@ -244,7 +244,7 @@ export function AvatarWithEffect({ profile, username, size = 'md', className = '
         </>
       )}
       {showStatus && (
-        <div className={`absolute -bottom-0.5 -right-0.5 ${STATUS_DOT_SIZE[size]} ${getStatusColor()} rounded-full border-2 border-zinc-900 shadow-lg`} />
+        <div className={`absolute -bottom-0.5 -right-0.5 ${STATUS_DOT_SIZE[size]} ${getStatusColor()} rounded-full border-2 border-zinc-900 shadow-lg z-10`} />
       )}
     </div>
   );
