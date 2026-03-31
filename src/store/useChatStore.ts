@@ -99,6 +99,8 @@ interface ChatStore {
   updateLastReadToNow: () => void;
   setMessageCache: (channelId: string, data: { messages: any[]; hasMore: boolean; oldestMessageId: string | null }) => void;
   addMessagesToCache: (channelId: string, messages: any[], prepend?: boolean) => void;
+  updateMessageInCache: (channelId: string, messageId: string, updates: Partial<any>) => void;
+  deleteMessageFromCache: (channelId: string, messageId: string) => void;
   clearMessageCache: (channelId: string) => void;
   
   setReactions: (messageId: string, reactions: Reaction[]) => void;
@@ -287,6 +289,36 @@ export const useChatStore = create<ChatStore>()(
               oldestMessageId: messages.length > 0 && prepend 
                 ? messages[0].id 
                 : existing.oldestMessageId,
+            },
+          },
+        };
+      }),
+      
+      updateMessageInCache: (channelId, messageId, updates) => set((state) => {
+        const existing = state.messageCache[channelId];
+        if (!existing) return state;
+        return {
+          messageCache: {
+            ...state.messageCache,
+            [channelId]: {
+              ...existing,
+              messages: existing.messages.map(m => 
+                m.id === messageId ? { ...m, ...updates } : m
+              ),
+            },
+          },
+        };
+      }),
+      
+      deleteMessageFromCache: (channelId, messageId) => set((state) => {
+        const existing = state.messageCache[channelId];
+        if (!existing) return state;
+        return {
+          messageCache: {
+            ...state.messageCache,
+            [channelId]: {
+              ...existing,
+              messages: existing.messages.filter(m => m.id !== messageId),
             },
           },
         };

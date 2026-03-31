@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { X, Save, Circle, Settings, Star, Trophy, Zap, Flame, Sparkles, MessageSquare, ThumbsUp, Pin, CornerDownRight, AtSign, Construction, Heart, UserPlus, PartyPopper } from 'lucide-react';
+import { X, Save, Circle, Settings, Star, Trophy, Zap, Flame, Sparkles, MessageSquare, ThumbsUp, Pin, CornerDownRight, AtSign, Construction, Heart, UserPlus, PartyPopper, Award, ChevronDown, ChevronUp } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useChatStore } from '@/store/useChatStore';
 import { AvatarWithEffect } from './AvatarWithEffect';
 import { useAuth } from '@/hooks/useAuth';
-import type { UserStatus } from '@/types/database';
+import type { UserStatus, BadgeWithStatus } from '@/types/database';
 
 const STATUS_OPTIONS: { value: UserStatus; label: string; color: string }[] = [
   { value: 'online', label: 'Online', color: 'bg-emerald-500' },
@@ -31,8 +31,29 @@ interface ProfileModalProps {
   onlineUsers?: string[];
   challenges?: Challenge[];
   totalXP?: number;
+  badges?: BadgeWithStatus[];
   onClose: () => void;
 }
+
+const BADGE_ICONS: Record<string, string> = {
+  'message': '💬',
+  'message-circle': '💬',
+  'message-square': '💬',
+  'heart': '❤️',
+  'pin': '📌',
+  'plus-square': '➕',
+  'layers': '📚',
+  'log-in': '🚪',
+  'flame': '🔥',
+  'zap': '⚡',
+  'at-sign': '@️',
+  'corner-down-right': '↩️',
+  'star': '⭐',
+  'trophy': '🏆',
+  'award': '🏅',
+  'medal': '🎖️',
+  'crown': '👑',
+};
 
 const getChallengeIcon = (challenge: Challenge): LucideIcon => {
   if (challenge.type === 'login_streak') {
@@ -98,7 +119,7 @@ const getLevel = (xp: number): { level: number; title: string; currentXP: number
   };
 };
 
-export function ProfileModal({ profile, onlineUsers, challenges, totalXP = 0, onClose }: ProfileModalProps) {
+export function ProfileModal({ profile, onlineUsers, challenges, totalXP = 0, badges = [], onClose }: ProfileModalProps) {
   const { setShowSettings } = useChatStore();
   const { refetchProfiles } = useAuth();
   
@@ -109,6 +130,12 @@ export function ProfileModal({ profile, onlineUsers, challenges, totalXP = 0, on
   const [saving, setSaving] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showChallenges, setShowChallenges] = useState(false);
+  const [showBadges, setShowBadges] = useState(false);
+
+  const unlockedBadges = badges.filter((b: BadgeWithStatus) => b.unlocked);
+  const lockedBadges = badges.filter((b: BadgeWithStatus) => !b.unlocked);
+  const highlightedBadgeIds = profile?.highlighted_badges || [];
+  const highlightedBadges = unlockedBadges.filter((b: BadgeWithStatus) => highlightedBadgeIds.includes(b.id));
 
   const userTotalXP = profile?.total_xp || totalXP;
   const { level, title, currentXP, nextLevelXP } = getLevel(userTotalXP);
@@ -216,6 +243,36 @@ export function ProfileModal({ profile, onlineUsers, challenges, totalXP = 0, on
               </div>
             </div>
 
+            {/* Highlighted Badges Showcase */}
+            {highlightedBadges.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={14} className="text-indigo-400" />
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Featured</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {highlightedBadges.map((badge: BadgeWithStatus, index: number) => (
+                    <div
+                      key={badge.id}
+                      className="shrink-0 flex flex-col items-center gap-2 animate-fade-in"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <div 
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center border-2"
+                        style={{ 
+                          backgroundColor: badge.color + '20',
+                          borderColor: badge.color + '60',
+                        }}
+                      >
+                        <span className="text-3xl">{BADGE_ICONS[badge.icon] || '🏅'}</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-zinc-400 text-center max-w-16 truncate">{badge.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Stats Row */}
             <div className="flex gap-4 mb-4">
               <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg border border-white/5">
@@ -226,7 +283,75 @@ export function ProfileModal({ profile, onlineUsers, challenges, totalXP = 0, on
                 <Star size={14} className="text-amber-500" />
                 <span className="text-sm text-zinc-300">{earnedXP} XP earned</span>
               </div>
+              {badges.length > 0 && (
+                <button
+                  onClick={() => setShowBadges(!showBadges)}
+                  className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg border border-white/5 hover:bg-zinc-800 transition-colors"
+                >
+                  <Award size={14} className="text-purple-500" />
+                  <span className="text-sm text-zinc-300">{unlockedBadges.length}/{badges.length}</span>
+                  {showBadges ? <ChevronUp size={12} className="text-zinc-500" /> : <ChevronDown size={12} className="text-zinc-500" />}
+                </button>
+              )}
             </div>
+
+            {/* Badges Section */}
+            {showBadges && badges.length > 0 && (
+              <div className="mb-4 p-4 bg-zinc-800/30 rounded-xl border border-white/5">
+                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Badges</h4>
+                
+                {unlockedBadges.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Unlocked ({unlockedBadges.length})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {unlockedBadges.map((badge: BadgeWithStatus) => (
+                        <div
+                          key={badge.id}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border"
+                          style={{ 
+                            backgroundColor: badge.color + '20',
+                            borderColor: badge.color + '40'
+                          }}
+                          title={badge.description}
+                        >
+                          <span className="text-lg">{BADGE_ICONS[badge.icon] || '🏅'}</span>
+                          <div>
+                            <p className="text-xs font-semibold text-white">{badge.name}</p>
+                            <p className="text-[9px] text-zinc-400">{badge.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {lockedBadges.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Locked ({lockedBadges.length})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {lockedBadges.slice(0, 8).map((badge: BadgeWithStatus) => (
+                        <div
+                          key={badge.id}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700/50 opacity-50"
+                          title={badge.description}
+                        >
+                          <span className="text-lg grayscale">{BADGE_ICONS[badge.icon] || '🏅'}</span>
+                          <div>
+                            <p className="text-xs font-semibold text-zinc-400">{badge.name}</p>
+                            <p className="text-[9px] text-zinc-600">{badge.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {lockedBadges.length > 8 && (
+                        <div className="flex items-center px-3 py-2 text-xs text-zinc-500">
+                          +{lockedBadges.length - 8} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Completed Challenges Toggle */}
             {completedChallenges.length > 0 && (

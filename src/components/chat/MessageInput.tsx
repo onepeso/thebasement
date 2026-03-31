@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { supabase } from "@/lib/supabase";
-import { Send, AtSign, X, Clock } from "lucide-react";
+import { Send, AtSign, X, Clock, Reply } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { useToast } from "@/store/useToastStore";
 import { useSpamProtection } from "@/hooks/useSpamProtection";
@@ -166,24 +166,13 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
       )}
 
       {replyTo && (
-        <div className="mb-2 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl animate-fade-in">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
-            </div>
-            <p className="text-sm text-zinc-400/80 line-clamp-2 leading-relaxed pl-7">
-              {replyTo.text}
-            </p>
+        <div className="mb-2 p-2.5 bg-zinc-800/50 border border-white/5 rounded-xl animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Reply size={12} className="text-indigo-400 shrink-0" />
+            <span className="text-[10px] font-medium text-indigo-400 cursor-default">Reply to {replyTo.username}</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-indigo-500/50 to-transparent" />
           </div>
-          <button
-            type="button"
-            onClick={clearReplyTo}
-            className="shrink-0 p-1.5 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <X size={14} />
-          </button>
+          <p className="text-xs text-zinc-400 mt-1.5 ml-4 line-clamp-1 cursor-default">{replyTo.text}</p>
         </div>
       )}
 
@@ -210,7 +199,7 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
           <button
             type="submit"
             disabled={!input.trim()}
-            className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/30"
+            className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/30 cursor-pointer"
           >
             <Send size={16} />
           </button>

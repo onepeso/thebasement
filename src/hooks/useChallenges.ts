@@ -10,6 +10,7 @@ interface ChallengeDefinition {
   goal: number;
   xp_reward: number;
   icon: string;
+  badge_id?: string;
 }
 
 interface UserChallengeRecord {
@@ -150,6 +151,19 @@ export function useChallenges(userId: string | undefined) {
           .from('profiles')
           .update({ total_xp: newTotalXP })
           .eq('id', userId);
+        
+        // Unlock linked badge if exists
+        if (newlyCompleted.badge_id) {
+          await supabase
+            .from('user_badges')
+            .upsert({
+              user_id: userId,
+              badge_id: newlyCompleted.badge_id,
+            }, {
+              onConflict: 'user_id, badge_id',
+              ignoreDuplicates: true,
+            });
+        }
       }
     } catch (err) {
       console.error('Error updating challenge:', err);
@@ -195,6 +209,19 @@ export function useChallenges(userId: string | undefined) {
             .from('profiles')
             .update({ total_xp: newTotalXP })
             .eq('id', userId);
+          
+          // Unlock linked badge if exists
+          if (welcomeChallenge.badge_id) {
+            await supabase
+              .from('user_badges')
+              .upsert({
+                user_id: userId,
+                badge_id: welcomeChallenge.badge_id,
+              }, {
+                onConflict: 'user_id, badge_id',
+                ignoreDuplicates: true,
+              });
+          }
         }
       }
       

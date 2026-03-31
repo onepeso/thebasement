@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/store/useChatStore';
 
@@ -17,19 +17,32 @@ interface GroupedReaction {
 
 export function useReactions(channelId: string | undefined) {
   const { reactions, setReactions, addReaction, removeReaction } = useChatStore();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const channelIdRef = useRef(channelId);
+  const isSubscribedRef = useRef(false);
 
-  useEffect(() => {
-    if (!channelId) return;
+  const fetchReactions = useCallback(async () => {
+    if (!channelId || channelId !== channelIdRef.current) return;
 
-    const fetchReactions = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
       const { data: messages, error: msgError } = await supabase
         .from('messages')
         .select('id')
         .eq('channel_id', channelId);
 
-      if (msgError || !messages) return;
+      if (channelId !== channelIdRef.current) return;
 
-      if (messages.length > 0) {
+      if (msgError) {
+        setError(msgError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (messages && messages.length > 0) {
         const messageIds = messages.map(m => m.id);
         
         const { data: reactionsData, error: reactionError } = await supabase
@@ -37,9 +50,11 @@ export function useReactions(channelId: string | undefined) {
           .select('*')
           .in('message_id', messageIds);
 
-        if (reactionError || !reactionsData) return;
+        if (channelId !== channelIdRef.current) return;
 
-        if (reactionsData.length > 0) {
+        if (reactionError) {
+          setError(reactionError.message);
+        } else if (reactionsData && reactionsData.length > 0) {
           const grouped: Record<string, ReactionData[]> = {};
           reactionsData.forEach(r => {
             if (!grouped[r.message_id]) {
@@ -64,32 +79,67 @@ export function useReactions(channelId: string | undefined) {
             setReactions(msgId, Object.values(emojiGroups));
           });
         }
+        setError(null);
       }
-    };
+    } catch (err) {
+      if (channelId === channelIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch reactions');
+      }
+    } finally {
+      if (channelId === channelIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [channelId, setReactions]);
+
+  useEffect(() => {
+    channelIdRef.current = channelId;
+    isSubscribedRef.current = false;
+    setError(null);
+
+    if (!channelId) return;
 
     fetchReactions();
 
     const channel = supabase
       .channel('reactions-changes')
-        .on(
+      .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'message_reactions' },
+        { event: 'INSERT', schema: 'public', table: 'message_reactions' },
         (payload) => {
-          const newData = JSON.parse(JSON.stringify(payload.new)) as Record<string, string>;
-          const oldData = JSON.parse(JSON.stringify(payload.old)) as Record<string, string>;
-          if (payload.eventType === 'INSERT') {
+          if (channelId !== channelIdRef.current || !isSubscribedRef.current) return;
+          try {
+            const newData = JSON.parse(JSON.stringify(payload.new)) as Record<string, string>;
             addReaction(newData.message_id, newData.emoji, newData.user_id);
-          } else if (payload.eventType === 'DELETE') {
-            removeReaction(oldData.message_id, oldData.emoji, oldData.user_id);
+          } catch (err) {
+            console.error('Error handling reaction insert:', err);
           }
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          if (channelId !== channelIdRef.current || !isSubscribedRef.current) return;
+          try {
+            const oldData = JSON.parse(JSON.stringify(payload.old)) as Record<string, string>;
+            removeReaction(oldData.message_id, oldData.emoji, oldData.user_id);
+          } catch (err) {
+            console.error('Error handling reaction delete:', err);
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribedRef.current = true;
+        }
+      });
 
     return () => {
+      isSubscribedRef.current = false;
       supabase.removeChannel(channel);
     };
-  }, [channelId, setReactions, addReaction, removeReaction]);
+  }, [channelId, fetchReactions, addReaction, removeReaction]);
 
   const toggleReaction = async (messageId: string, emoji: string, userId: string) => {
     const messageReactions = reactions[messageId] || [];
@@ -103,8 +153,7 @@ export function useReactions(channelId: string | undefined) {
         .eq('user_id', userId)
         .eq('emoji', emoji);
       if (error) {
-        console.error('[Reactions] Delete error:', error);
-        return;
+        return { error: error.message };
       }
       removeReaction(messageId, emoji, userId);
     } else {
@@ -112,12 +161,12 @@ export function useReactions(channelId: string | undefined) {
         .from('message_reactions')
         .insert({ message_id: messageId, user_id: userId, emoji });
       if (error) {
-        console.error('[Reactions] Insert error:', error);
-        return;
+        return { error: error.message };
       }
       addReaction(messageId, emoji, userId);
     }
+    return { success: true };
   };
 
-  return { reactions, toggleReaction };
+  return { reactions, loading, error, toggleReaction };
 }

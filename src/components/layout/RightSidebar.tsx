@@ -6,7 +6,7 @@ import { MessageStats } from './MessageStats';
 interface RightSidebarProps {
   allProfiles: Profile[];
   onlineUsers: string[];
-  onJumpToMessage: (messageId: string) => void;
+  onJumpToMessage: (messageId: string, channelId?: string) => void;
 }
 
 export function RightSidebar({ allProfiles, onlineUsers, onJumpToMessage }: RightSidebarProps) {

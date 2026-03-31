@@ -21,34 +21,38 @@ const SIZE_CLASSES = {
 
 const ACCESSORY_SIZE_CLASSES = {
   sm: { 
-    top: '-top-0.5', 
-    right: '-right-0.5',
-    bottom: '-bottom-0.5',
+    top: '-top-1', 
+    right: '-right-1',
+    bottom: '-bottom-1',
     svg: 'w-5 h-5',
+    png: 'w-8 h-8 sm:w-10 sm:h-10',
     ring: 'ring-[3px]',
     blur: 'blur-sm',
   },
   md: { 
-    top: '-top-1', 
-    right: '-right-1',
-    bottom: '-bottom-1',
+    top: '-top-1.5', 
+    right: '-right-1.5',
+    bottom: '-bottom-1.5',
     svg: 'w-6 h-6',
+    png: 'w-12 h-12 sm:w-14 sm:h-14',
     ring: 'ring-[4px]',
     blur: 'blur-md',
   },
   lg: { 
-    top: '-top-1.5', 
-    right: '-right-1.5',
-    bottom: '-bottom-1.5',
+    top: '-top-2', 
+    right: '-right-2',
+    bottom: '-bottom-2',
     svg: 'w-7 h-7',
+    png: 'w-14 h-14 sm:w-16 sm:h-16',
     ring: 'ring-[5px]',
     blur: 'blur-lg',
   },
   xl: { 
-    top: '-top-2', 
-    right: '-right-2',
-    bottom: '-bottom-2',
+    top: '-top-3', 
+    right: '-right-3',
+    bottom: '-bottom-3',
     svg: 'w-12 h-12',
+    png: 'w-20 h-20 sm:w-24 sm:h-24',
     ring: 'ring-[6px]',
     blur: 'blur-xl',
   },
@@ -71,6 +75,7 @@ export function AvatarWithEffect({ profile, username, size = 'md', className = '
   const avatarUrl = profile?.avatar_url || `https://ui-avatars.com/api/?name=${username || profile?.username || 'U'}`;
   const effect = profile?.avatar_effect;
   const overlay = profile?.avatar_overlays;
+  const overlayUrl = profile?.avatar_overlay_url;
   const storedStatus = profile?.status as string | undefined;
   
   const status = isOnline 
@@ -146,6 +151,18 @@ export function AvatarWithEffect({ profile, username, size = 'md', className = '
   };
 
   const renderAccessory = () => {
+    if (overlayUrl && overlayUrl !== 'none') {
+      return (
+        <div className={`absolute ${sizeConfig.top} left-1/2 -translate-x-1/2 z-20 drop-shadow-lg`}>
+          <img 
+            src={overlayUrl} 
+            className={`${sizeConfig.png} object-contain`}
+            alt="avatar overlay"
+          />
+        </div>
+      );
+    }
+
     if (!overlay || overlay === 'none') return null;
 
     if (overlay === 'crown') {

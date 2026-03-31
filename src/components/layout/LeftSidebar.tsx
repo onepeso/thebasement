@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { useChatStore } from "@/store/useChatStore";
-import { LogOut, Hash, Settings, X, Plus, Shield, Pencil } from "lucide-react";
+import { LogOut, Hash, Settings, X, Plus, Shield, Pencil, UserPlus, Users, Globe } from "lucide-react";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 import { cleanupPresence } from "@/hooks/usePresence";
 import type { UserStatus } from "@/types/database";
@@ -15,6 +15,10 @@ interface LeftSidebarProps {
   onClose?: () => void;
   onCreateChannel?: () => void;
   onEditChannel?: (channel: any) => void;
+  onInvite?: (channel: any) => void;
+  onViewMembers?: (channel: any) => void;
+  onDiscover?: () => void;
+  memberCounts?: Record<string, number>;
 }
 
 const STATUS_CONFIG: Record<UserStatus, { dot: string; label: string; text: string }> = {
@@ -25,7 +29,7 @@ const STATUS_CONFIG: Record<UserStatus, { dot: string; label: string; text: stri
   offline: { dot: 'bg-zinc-600', label: 'Offline', text: 'text-zinc-600' },
 };
 
-export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile, activeChannel, isMobile, onClose, onCreateChannel, onEditChannel }: LeftSidebarProps) {
+export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile, activeChannel, isMobile, onClose, onCreateChannel, onEditChannel, onInvite, onViewMembers, onDiscover, memberCounts }: LeftSidebarProps) {
   const { channels, setActiveChannel } = useChatStore();
   
   const allOnlineUsers = myProfile?.id && onlineUsers 
@@ -44,7 +48,6 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
   
   const userChannels = channels.filter((c: any) => c.is_official);
   const myChannels = channels.filter((c: any) => c.created_by === myProfile?.id);
-  const otherChannels = channels.filter((c: any) => !c.is_official && c.created_by !== myProfile?.id);
 
   const canEditChannel = (channel: any) => {
     return channel.created_by === myProfile?.id || (isAdmin && channel.is_official);
@@ -60,10 +63,22 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
     onEditChannel?.(chan);
   };
 
-  const renderChannelItem = (chan: any, isOfficial: boolean, showCreator: boolean = false) => {
+  const handleInviteClick = (e: any, chan: any) => {
+    e.stopPropagation();
+    onInvite?.(chan);
+  };
+
+  const handleViewMembersClick = (e: any, chan: any) => {
+    e.stopPropagation();
+    onViewMembers?.(chan);
+  };
+
+  const renderChannelItem = (chan: any, isOfficial: boolean, showCreator: boolean = false, canInvite: boolean = false) => {
     const canEdit = canEditChannel(chan);
     const isActive = activeChannel?.id === chan.id;
     const creatorUsername = showCreator ? getCreatorUsername(chan.created_by) : null;
+    const emoji = chan.emoji || '💬';
+    const hasEmoji = emoji !== '💬';
 
     return (
       <div
@@ -75,7 +90,11 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
             : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
         }`}
       >
-        <Hash size={14} className={`shrink-0 ${isActive ? "text-indigo-200" : "text-zinc-700 group-hover:text-zinc-500"}`} />
+        {hasEmoji ? (
+          <span className="shrink-0 text-base">{emoji}</span>
+        ) : (
+          <Hash size={14} className={`shrink-0 ${isActive ? "text-indigo-200" : "text-zinc-700 group-hover:text-zinc-500"}`} />
+        )}
         <span className="truncate font-medium">{chan.name}</span>
         {isOfficial && (
           <Shield size={10} className={`shrink-0 ${isActive ? "text-indigo-300" : "text-indigo-500"}`} />
@@ -85,16 +104,40 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
             by {creatorUsername}
           </span>
         )}
-        {canEdit && (
+        <div className="ml-auto flex items-center gap-1">
+          {canInvite && (
+            <button
+              onClick={(e) => handleInviteClick(e, chan)}
+              className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+                isActive ? "text-indigo-200 hover:bg-indigo-500/30" : "text-zinc-600 hover:bg-white/10"
+              }`}
+              title="Invite members"
+            >
+              <UserPlus size={12} />
+            </button>
+          )}
           <button
-            onClick={(e) => handleEditClick(e, chan)}
-            className={`ml-auto p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
-              isActive ? "text-indigo-200 hover:bg-indigo-500/30" : "text-zinc-600 hover:bg-white/10"
+            onClick={(e) => handleViewMembersClick(e, chan)}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+              isActive ? "text-indigo-200 bg-indigo-500/20" : "text-zinc-500 bg-zinc-800/50"
             }`}
+            title="View members"
           >
-            <Pencil size={12} />
+            <Users size={10} />
+            {memberCounts?.[chan.id] ?? 0}
           </button>
-        )}
+          {canEdit && (
+            <button
+              onClick={(e) => handleEditClick(e, chan)}
+              className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+                isActive ? "text-indigo-200 hover:bg-indigo-500/30" : "text-zinc-600 hover:bg-white/10"
+              }`}
+              title="Edit channel"
+            >
+              <Pencil size={12} />
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -146,19 +189,7 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
               </span>
               <span className="text-[9px] text-zinc-600">{myChannels.length}/3</span>
             </div>
-            {myChannels.map((chan: any) => renderChannelItem(chan, false))}
-          </div>
-        )}
-        
-        {/* Other User Channels */}
-        {otherChannels.length > 0 && (
-          <div className="p-2 border-t border-white/5">
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                Community
-              </span>
-            </div>
-            {otherChannels.map((chan: any) => renderChannelItem(chan, false, true))}
+            {myChannels.map((chan: any) => renderChannelItem(chan, false, false, true))}
           </div>
         )}
         
@@ -174,6 +205,17 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
             </button>
           </div>
         )}
+
+        {/* Discover Button */}
+        <div className="p-2 border-t border-white/5">
+          <button
+            onClick={() => { onDiscover?.(); onClose?.(); }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-white hover:bg-white/5 transition-all duration-200"
+          >
+            <Globe size={14} className="shrink-0" />
+            <span className="font-medium">Discover Channels</span>
+          </button>
+        </div>
       </div>
 
       {/* Bottom Section - Profile */}
@@ -198,7 +240,7 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
           <div className="flex items-center ml-2">
             <button
               onClick={() => useChatStore.getState().setShowSettings(true)}
-              className="p-2 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-700/50 rounded-lg transition-all duration-200"
+              className="p-2 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-700/50 rounded-lg transition-all duration-200 cursor-pointer"
               title="Settings"
             >
               <Settings size={15} />
@@ -208,7 +250,7 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
                 cleanupPresence();
                 supabase.auth.signOut();
               }}
-              className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200"
+              className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 cursor-pointer"
               title="Sign Out"
             >
               <LogOut size={15} />

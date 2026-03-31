@@ -11,6 +11,9 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useTyping } from "@/hooks/useTyping";
 import { useUpdate } from "@/hooks/useUpdate";
 import { useChallenges } from "@/hooks/useChallenges";
+import { useInvites } from "@/hooks/useInvites";
+import { useChannelMembers } from "@/hooks/useChannelMembers";
+import { useBadges } from "@/hooks/useBadges";
 import { useChatStore } from "@/store/useChatStore";
 import { ToastContainer, useToast } from "@/store/useToastStore";
 import { TitleBar } from "@/components/layout/TitleBar";
@@ -26,13 +29,20 @@ import { UpdateNotification } from "@/components/ui/UpdateNotification";
 import { UpdateModal } from "@/components/ui/UpdateModal";
 import { CreateChannelModal } from "@/components/ui/CreateChannelModal";
 import { EditChannelModal } from "@/components/ui/EditChannelModal";
+import { InviteModal } from "@/components/ui/InviteModal";
+import { InviteNotificationModal } from "@/components/ui/InviteNotificationModal";
+import { ChannelMembersModal } from "@/components/ui/ChannelMembersModal";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { CommandPalette, useKeyboardShortcuts } from "@/components/ui/CommandPalette";
 import { KeyboardShortcutsModal } from "@/components/ui/KeyboardShortcutsModal";
 import { ChallengesModal } from "@/components/ui/ChallengesModal";
 import { ChallengeCompletedToast } from "@/components/ui/ChallengeCompletedToast";
+import { BadgeUnlockedToast } from "@/components/ui/BadgeUnlockedToast";
+import { SearchModal } from "@/components/ui/SearchModal";
+import { ChannelDiscoveryModal } from "@/components/ui/ChannelDiscoveryModal";
+import { NotificationModal } from "@/components/ui/NotificationModal";
 import AuthScreen from "@/components/ui/AuthScreen";
-import { ChevronDown, ArrowDown, Hash, Search, X, Menu, Command, Trophy } from "lucide-react";
+import { ChevronDown, ArrowDown, Hash, Search, X, Menu, Command, Trophy, UserPlus, Bell } from "lucide-react";
 
 export default function Home() {
   const { session, allProfiles, myProfile, loading: authLoading } = useAuth();
@@ -44,8 +54,15 @@ export default function Home() {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showDiscovery, setShowDiscovery] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showChallenges, setShowChallenges] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [editingChannel, setEditingChannel] = useState<any>(null);
+  const [invitingChannel, setInvitingChannel] = useState<any>(null);
+  const [viewingMembersChannel, setViewingMembersChannel] = useState<any>(null);
+  const [showInviteNotification, setShowInviteNotification] = useState(false);
   const { confirm: showConfirm, ConfirmComponent: ConfirmModalComponent, config: confirmConfig, close: closeConfirm } = useConfirm();
   const toast = useToast();
 
@@ -58,7 +75,7 @@ export default function Home() {
   const messageInputRef = useRef<{ focus: () => void } | null>(null);
 
   const onlineUsers = usePresence(session?.user?.id);
-  const { messages, hasMore, loading, loadingMore, loadMore } = useChat(activeChannel?.id, session?.user?.id);
+  const { messages, hasMore, loading, loadingMore, loadMore, deleteMessage } = useChat(activeChannel?.id, session?.user?.id);
   const { typingUsers, startTyping, stopTyping } = useTyping(session?.user?.id, myProfile?.username);
   const { update: updateInfo, checkForUpdates } = useUpdate();
   
@@ -77,7 +94,41 @@ export default function Home() {
     loading: challengesLoading 
   } = useChallenges(session?.user?.id);
   
+  const { 
+    pendingInvites, 
+    sentInvites,
+    sendInvite, 
+    acceptInvite, 
+    declineInvite,
+    checkUserInvited,
+    refreshInvites 
+  } = useInvites(session?.user?.id);
+  
+  const { 
+    members: channelMembers,
+    loading: membersLoading,
+    error: membersError,
+    removeMember,
+    isOwner: checkIsOwner,
+    refreshMembers 
+  } = useChannelMembers(viewingMembersChannel?.id || activeChannel?.id);
+  
+  const {
+    badges,
+    newBadge,
+    checkAndUnlockBadge,
+  } = useBadges(session?.user?.id);
+  
   const completedCount = challenges.filter((c: any) => c.completed).length;
+  
+  const handleMessageSent = useCallback(async () => {
+    trackMessage();
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session?.user?.id);
+    checkAndUnlockBadge('messages', count || 1);
+  }, [trackMessage, checkAndUnlockBadge, session?.user?.id]);
   
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
@@ -87,6 +138,8 @@ export default function Home() {
     setShowCommandPalette(false);
     setShowShortcuts(false);
     setEditingChannel(null);
+    setInvitingChannel(null);
+    setViewingMembersChannel(null);
   }, []);
 
   useKeyboardShortcuts({
@@ -114,6 +167,12 @@ export default function Home() {
       trackLogin();
     }
   }, [session, checkForUpdates, trackLogin]);
+  
+  useEffect(() => {
+    if (pendingInvites.length > 0 && !showInviteNotification) {
+      setShowInviteNotification(true);
+    }
+  }, [pendingInvites.length, showInviteNotification]);
   
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -212,13 +271,19 @@ export default function Home() {
       onConfirm: async () => {
         const { error } = await supabase.from("messages").delete().eq("id", id);
         if (error) {
+          console.error("Delete error:", error);
           toast.error("Failed to delete message");
         } else {
+          deleteMessage(id);
           toast.success("Message deleted");
         }
         closeConfirm();
       },
     });
+  };
+
+  const handleEdit = (msgId: string, newText: string, editedAt: string) => {
+    useChatStore.getState().updateMessageInCache(activeChannel?.id || '', msgId, { text: newText, edited_at: editedAt });
   };
 
   const handleReply = (msg: any) => {
@@ -251,14 +316,31 @@ export default function Home() {
     }
   };
 
-  const handleJumpToMessage = (messageId: string) => {
-    const element = document.getElementById(`message-${messageId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-zinc-950');
-      setTimeout(() => {
-        element.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-zinc-950');
-      }, 2000);
+  const handleJumpToMessage = (messageId: string, channelId?: string) => {
+    if (channelId && activeChannel?.id !== channelId) {
+      const channel = channels.find((c: any) => c.id === channelId);
+      if (channel) {
+        setActiveChannel(channel);
+        setTimeout(() => {
+          const element = document.getElementById(`message-${messageId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-zinc-950');
+            setTimeout(() => {
+              element.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-zinc-950');
+            }, 2000);
+          }
+        }, 500);
+      }
+    } else {
+      const element = document.getElementById(`message-${messageId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-zinc-950');
+        setTimeout(() => {
+          element.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-2', 'ring-offset-zinc-950');
+        }, 2000);
+      }
     }
   };
 
@@ -300,13 +382,20 @@ export default function Home() {
             activeChannel={activeChannel}
             onCreateChannel={() => setShowCreateChannel(true)}
             onEditChannel={(channel) => setEditingChannel(channel)}
+            onInvite={(channel) => setInvitingChannel(channel)}
+            onViewMembers={(channel) => setViewingMembersChannel(channel)}
+            onDiscover={() => setShowDiscovery(true)}
+            memberCounts={{}}
           />
         </div>
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col bg-zinc-900/30 min-w-0 relative">
           {/* Channel Header */}
-          <header className="h-14 lg:h-16 flex items-center justify-between px-4 lg:px-6 shrink-0 z-20 border-b border-white/5 bg-zinc-900/80 backdrop-blur-none lg:backdrop-blur-xl">
+          <header 
+            className="h-14 lg:h-16 flex items-center justify-between px-4 lg:px-6 shrink-0 z-20 border-b border-white/5 bg-zinc-900/80 backdrop-blur-none lg:backdrop-blur-xl"
+            style={{ borderTopWidth: 3, borderTopColor: (activeChannel as any)?.accent_color || '#ffffff' }}
+          >
             <div className="flex items-center gap-3">
               {/* Mobile Menu Button */}
               <button
@@ -315,9 +404,43 @@ export default function Home() {
               >
                 <Menu size={20} />
               </button>
-              <div className="w-8 lg:w-10 h-8 lg:h-10 rounded-xl bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border border-indigo-500/20 flex items-center justify-center">
-                <Hash size={16} className="lg:text-lg text-indigo-400" />
-              </div>
+              {(() => {
+                const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
+                  indigo: { from: '#4f46e5', to: '#7c3aed' },
+                  blue: { from: '#2563eb', to: '#06b6d4' },
+                  purple: { from: '#9333ea', to: '#db2777' },
+                  emerald: { from: '#059669', to: '#10b981' },
+                  orange: { from: '#ea580c', to: '#f97316' },
+                  red: { from: '#dc2626', to: '#f43f5e' },
+                  pink: { from: '#db2777', to: '#e879f9' },
+                  cyan: { from: '#0891b2', to: '#22d3ee' },
+                  amber: { from: '#d97706', to: '#fbbf24' },
+                  slate: { from: '#334155', to: '#64748b' },
+                };
+                const channelColor = (activeChannel as any)?.color || 'indigo';
+                const color = GRADIENT_COLORS[channelColor] || GRADIENT_COLORS.indigo;
+                const emoji = (activeChannel as any)?.emoji as string | undefined;
+                const hasEmoji = emoji && emoji !== '💬';
+                const accentColor = (activeChannel as any)?.accent_color || '#ffffff';
+                return (
+                  <div 
+                    className="w-8 lg:w-10 h-8 lg:h-10 rounded-xl flex items-center justify-center relative"
+                    style={{ background: `linear-gradient(135deg, ${color.from}, ${color.to})` }}
+                  >
+                    <div 
+                      className="absolute inset-0 rounded-xl"
+                      style={{ boxShadow: `inset 0 0 0 2px ${accentColor}` }}
+                    />
+                    <div className="relative">
+                      {hasEmoji ? (
+                        <span className="text-lg">{emoji}</span>
+                      ) : (
+                        <Hash size={16} className="lg:text-lg text-white/80" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="min-w-0">
                 <h1 className="text-sm lg:text-base font-bold text-white tracking-tight truncate">
                   {activeChannel?.name || "loading"}
@@ -336,8 +459,21 @@ export default function Home() {
             
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setIsSearching(!isSearching)}
-                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${isSearching ? 'bg-indigo-600 text-white' : 'bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                onClick={() => setShowNotifications(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all relative"
+                title="Notifications"
+              >
+                <Bell size={16} />
+                {pendingInvites.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center">
+                    {pendingInvites.length > 9 ? '9+' : pendingInvites.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setShowSearch(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
+                title="Search messages"
               >
                 <Search size={16} />
               </button>
@@ -459,6 +595,7 @@ export default function Home() {
                         msg={msg}
                         isMe={msg.user_id === session.user.id}
                         onDelete={handleDelete}
+                        onEdit={handleEdit}
                         showNewDivider={isFirstNew}
                         isGrouped={isGrouped}
                         reactions={reactions[msg.id] || []}
@@ -552,7 +689,7 @@ export default function Home() {
                   username={myProfile.username}
                   onTyping={() => startTyping(activeChannel.id)}
                   onStopTyping={() => stopTyping(activeChannel.id)}
-                  onMessageSent={trackMessage}
+                  onMessageSent={handleMessageSent}
                   onReplySent={trackReply}
                   onMentionSent={trackMention}
                 />
@@ -583,17 +720,27 @@ export default function Home() {
               onClose={() => setShowMobileSidebar(false)}
               onCreateChannel={() => { setShowMobileSidebar(false); setShowCreateChannel(true); }}
               onEditChannel={(channel) => { setShowMobileSidebar(false); setEditingChannel(channel); }}
+              onInvite={(channel) => { setShowMobileSidebar(false); setInvitingChannel(channel); }}
+              onViewMembers={(channel) => { setShowMobileSidebar(false); setViewingMembersChannel(channel); }}
+              onDiscover={() => { setShowMobileSidebar(false); setShowDiscovery(true); }}
+              memberCounts={{}}
             />
           </div>
         )}
 
-        <SettingsModal myProfile={myProfile} />
+        <SettingsModal 
+          myProfile={myProfile} 
+          challenges={challenges}
+          totalXP={totalXP}
+          badges={badges}
+        />
         {showProfile && myProfile && (
           <ProfileModal 
             profile={myProfile} 
             onlineUsers={onlineUsers}
             challenges={challenges}
             totalXP={totalXP}
+            badges={badges}
             onClose={() => setShowProfile(false)} 
           />
         )}
@@ -667,6 +814,164 @@ export default function Home() {
         <ChallengeCompletedToast
           challenge={newCompletedChallenge}
           onClose={clearNewCompleted}
+        />
+        <BadgeUnlockedToast
+          badge={newBadge}
+          onClose={() => {}}
+        />
+        {invitingChannel && (
+          <InviteModal
+            channel={invitingChannel}
+            allProfiles={allProfiles}
+            onlineUsers={onlineUsers}
+            currentUserId={session?.user?.id}
+            invitedUserIds={sentInvites
+              .filter((i) => i.channel_id === invitingChannel.id)
+              .map((i) => i.invited_user_id)}
+            onInvite={async (userId) => {
+              return sendInvite(invitingChannel.id, userId);
+            }}
+            onClose={() => setInvitingChannel(null)}
+          />
+        )}
+        <InviteNotificationModal
+          invites={pendingInvites}
+          onlineUsers={onlineUsers}
+          onAccept={async (invite) => {
+            const result = await acceptInvite(invite);
+            if (result.success) {
+              await supabase.from("channel_members").insert({
+                channel_id: invite.channel_id,
+                user_id: session?.user?.id,
+                role: "member",
+              });
+              
+              const inviterProfile = invite.inviter?.username || "Someone";
+              await supabase.from("messages").insert({
+                channel_id: invite.channel_id,
+                user_id: session?.user?.id,
+                text: `joined the channel`,
+                is_system: true,
+              });
+              refreshInvites();
+              refreshMembers?.();
+            }
+            return result;
+          }}
+          onDecline={declineInvite}
+          onClose={() => setShowInviteNotification(false)}
+        />
+        {viewingMembersChannel && (
+          <ChannelMembersModal
+            channel={viewingMembersChannel}
+            members={channelMembers}
+            currentUserId={session?.user?.id}
+            onlineUsers={onlineUsers}
+            loading={membersLoading}
+            error={membersError}
+            onRemoveMember={async (member) => {
+              const result = await removeMember(member.id);
+              if (result.success) {
+                await supabase.from("messages").insert({
+                  channel_id: viewingMembersChannel.id,
+                  user_id: member.user_id,
+                  text: `was removed from the channel`,
+                  is_system: true,
+                });
+              }
+              return result;
+            }}
+            onRefresh={refreshMembers}
+            onLeaveChannel={async () => {
+              const currentMember = channelMembers.find(m => m.user_id === session?.user?.id);
+              if (currentMember) {
+                const result = await removeMember(currentMember.id);
+                if (result.success) {
+                  await supabase.from('messages').insert({
+                    channel_id: viewingMembersChannel.id,
+                    user_id: session?.user?.id,
+                    text: 'left the channel',
+                    is_system: true,
+                  });
+                  setViewingMembersChannel(null);
+                  if (activeChannel?.id === viewingMembersChannel.id) {
+                    setActiveChannel(null);
+                  }
+                }
+                return result;
+              }
+              return { success: true };
+            }}
+            onClose={() => setViewingMembersChannel(null)}
+          />
+        )}
+        <SearchModal
+          open={showSearch}
+          allProfiles={allProfiles}
+          onClose={() => setShowSearch(false)}
+          onJumpToMessage={handleJumpToMessage}
+        />
+        <ChannelDiscoveryModal
+          open={showDiscovery}
+          allProfiles={allProfiles}
+          onClose={() => setShowDiscovery(false)}
+          onSelectChannel={(channel) => {
+            setActiveChannel(channel);
+            setShowDiscovery(false);
+          }}
+        />
+        <NotificationModal
+          open={showNotifications}
+          notifications={pendingInvites.map((invite) => ({
+            id: invite.id,
+            type: 'invite' as const,
+            title: 'Channel Invitation',
+            message: `${invite.inviter?.username || 'Someone'} invited you to #${invite.channel?.name || 'a channel'}`,
+            timestamp: invite.created_at,
+            read: false,
+            data: {
+              channelId: invite.channel_id,
+              channelName: invite.channel?.name,
+              inviterName: invite.inviter?.username,
+            },
+          }))}
+          onClose={() => setShowNotifications(false)}
+          onAcceptInvite={async (inviteId) => {
+            const invite = pendingInvites.find(i => i.id === inviteId);
+            if (invite) {
+              await acceptInvite(invite);
+              await supabase.from('channel_members').insert({
+                channel_id: invite.channel_id,
+                user_id: session?.user?.id,
+                role: 'member',
+              });
+              await supabase.from('messages').insert({
+                channel_id: invite.channel_id,
+                user_id: session?.user?.id,
+                text: 'joined the channel',
+                is_system: true,
+              });
+              refreshInvites();
+              refreshMembers?.();
+            }
+          }}
+          onDeclineInvite={async (inviteId) => {
+            const invite = pendingInvites.find(i => i.id === inviteId);
+            if (invite) {
+              await declineInvite(invite);
+              refreshInvites();
+            }
+          }}
+          onViewChannel={(channelId) => {
+            const channel = channels.find(c => c.id === channelId);
+            if (channel) {
+              setActiveChannel(channel);
+              setShowNotifications(false);
+            }
+          }}
+          onClearAll={() => {
+            setShowNotifications(false);
+          }}
         />
       </div>
     </div>

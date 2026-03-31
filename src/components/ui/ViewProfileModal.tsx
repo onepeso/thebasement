@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
-import { X, Circle, Zap, Trophy, Star, Flame, Sparkles, MessageSquare, ThumbsUp, Pin, CornerDownRight, AtSign, Construction, Heart, UserPlus, PartyPopper } from 'lucide-react';
+import { X, Circle, Zap, Trophy, Star, Flame, Sparkles, MessageSquare, ThumbsUp, Pin, CornerDownRight, AtSign, Construction, Heart, UserPlus, PartyPopper, Award } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/store/useChatStore';
 import { AvatarWithEffect } from './AvatarWithEffect';
 import { useAuth } from '@/hooks/useAuth';
-import type { UserStatus } from '@/types/database';
+import type { UserStatus, BadgeWithStatus } from '@/types/database';
+
+const BADGE_ICONS: Record<string, string> = {
+  'message': '💬', 'message-circle': '💬', 'message-square': '💬',
+  'heart': '❤️', 'pin': '📌', 'plus-square': '➕', 'layers': '📚',
+  'log-in': '🚪', 'flame': '🔥', 'zap': '⚡', 'at-sign': '@️',
+  'corner-down-right': '↩️', 'star': '⭐', 'trophy': '🏆',
+  'award': '🏅', 'medal': '🎖️', 'crown': '👑',
+};
 
 const STATUS_COLORS: Record<string, { dot: string; label: string; text: string }> = {
   online: { dot: 'bg-emerald-500', label: 'Online', text: 'text-emerald-400' },
@@ -97,6 +105,8 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
   const { viewProfile, setViewProfile } = useChatStore();
   const { allProfiles } = useAuth();
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
+  const [userBadges, setUserBadges] = useState<any[]>([]);
+  const [allBadges, setAllBadges] = useState<BadgeWithStatus[]>([]);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
 
   useEffect(() => {
@@ -107,17 +117,19 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
     const doFetch = async () => {
       setLoadingChallenges(true);
       try {
-        const { data: challenges } = await supabase
-          .from('user_challenges')
-          .select('*, challenge:challenges(*)')
-          .eq('user_id', viewProfile.id)
-          .eq('completed', true);
+        const [challengesRes, badgesRes, allBadgesRes] = await Promise.all([
+          supabase.from('user_challenges').select('*, challenge:challenges(*)').eq('user_id', viewProfile.id).eq('completed', true),
+          supabase.from('user_badges').select('*, badge:badges(*)').eq('user_id', viewProfile.id),
+          supabase.from('badges').select('*'),
+        ]);
 
         if (!cancelled) {
-          setUserChallenges(challenges || []);
+          setUserChallenges(challengesRes.data || []);
+          setUserBadges(badgesRes.data || []);
+          setAllBadges(allBadgesRes.data || []);
         }
       } catch (err) {
-        console.error('Error fetching user challenges:', err);
+        console.error('Error fetching user data:', err);
       }
       if (!cancelled) {
         setLoadingChallenges(false);
@@ -142,6 +154,15 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
   const userTotalXP = profileData.total_xp || 0;
   const { level, title } = getLevel(userTotalXP);
   const earnedXP = userChallenges.reduce((sum, uc) => sum + (uc.challenge?.xp_reward || 0), 0);
+  
+  const unlockedBadgeIds = new Set(userBadges.map((ub: any) => ub.badge_id));
+  const badgesWithStatus: BadgeWithStatus[] = (allBadges || []).map((badge: BadgeWithStatus) => ({
+    ...badge,
+    unlocked: unlockedBadgeIds.has(badge.id),
+    unlocked_at: userBadges.find((ub: any) => ub.badge_id === badge.id)?.unlocked_at,
+  }));
+  const highlightedBadgeIds = profileData.highlighted_badges || [];
+  const highlightedBadges = badgesWithStatus.filter((b: BadgeWithStatus) => b.unlocked && highlightedBadgeIds.includes(b.id));
 
   return (
     <div 
@@ -207,7 +228,43 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
                 <Star size={14} className="text-amber-500" />
                 <span className="text-sm text-zinc-300">{earnedXP} XP earned</span>
               </div>
+              {userBadges.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg border border-white/5">
+                  <Award size={14} className="text-purple-500" />
+                  <span className="text-sm text-zinc-300">{userBadges.length}</span>
+                </div>
+              )}
             </div>
+
+            {/* Highlighted Badges */}
+            {highlightedBadges.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={14} className="text-indigo-400" />
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Featured</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {highlightedBadges.map((badge: BadgeWithStatus, index: number) => (
+                    <div
+                      key={badge.id}
+                      className="shrink-0 flex flex-col items-center gap-2 animate-fade-in"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <div 
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center border-2"
+                        style={{ 
+                          backgroundColor: badge.color + '20',
+                          borderColor: badge.color + '60',
+                        }}
+                      >
+                        <span className="text-3xl">{BADGE_ICONS[badge.icon] || '🏅'}</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-zinc-400 text-center max-w-16 truncate">{badge.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Status */}
             <div className="flex items-center gap-2 mb-4">

@@ -1,17 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/store/useChatStore';
 
 export function usePinnedMessages(channelId: string | undefined) {
   const { pinnedMessages, setPinnedMessages, addPinnedMessage, removePinnedMessage } = useChatStore();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const channelIdRef = useRef(channelId);
+  const isSubscribedRef = useRef(false);
 
-  useEffect(() => {
-    if (!channelId) return;
+  const fetchPinnedMessages = useCallback(async () => {
+    if (!channelId || channelId !== channelIdRef.current) return;
 
-    setPinnedMessages([]);
+    setLoading(true);
+    setError(null);
 
-    const fetchPinnedMessages = async () => {
-      const { data } = await supabase
+    try {
+      const { data, error: fetchError } = await supabase
         .from('pinned_messages')
         .select(`
           *,
@@ -19,10 +24,34 @@ export function usePinnedMessages(channelId: string | undefined) {
         `)
         .eq('channel_id', channelId);
 
-      if (data) {
-        setPinnedMessages(data);
+      if (channelId !== channelIdRef.current) return;
+
+      if (fetchError) {
+        setError(fetchError.message);
+      } else {
+        setPinnedMessages(data || []);
+        setError(null);
       }
-    };
+    } catch (err) {
+      if (channelId === channelIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch pinned messages');
+      }
+    } finally {
+      if (channelId === channelIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [channelId, setPinnedMessages]);
+
+  useEffect(() => {
+    channelIdRef.current = channelId;
+    isSubscribedRef.current = false;
+    setError(null);
+
+    if (!channelId) {
+      setPinnedMessages([]);
+      return;
+    }
 
     fetchPinnedMessages();
 
@@ -31,19 +60,15 @@ export function usePinnedMessages(channelId: string | undefined) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pinned_messages' },
-        async (payload) => {
-          const newData = JSON.parse(JSON.stringify(payload.new)) as Record<string, string>;
-          const { data } = await supabase
-            .from('pinned_messages')
-            .select(`
-              *,
-              message:messages(*, profiles:user_id(username, avatar_url))
-            `)
-            .eq('id', newData.id)
-            .single();
-          
-          if (data) {
-            addPinnedMessage(JSON.parse(JSON.stringify(data)));
+        (payload) => {
+          if (channelId !== channelIdRef.current || !isSubscribedRef.current) return;
+          try {
+            const newData = JSON.parse(JSON.stringify(payload.new)) as any;
+            if (newData.channel_id === channelId) {
+              addPinnedMessage(newData);
+            }
+          } catch (err) {
+            console.error('Error handling pinned insert:', err);
           }
         }
       )
@@ -51,19 +76,29 @@ export function usePinnedMessages(channelId: string | undefined) {
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'pinned_messages' },
         (payload) => {
-          const oldData = JSON.parse(JSON.stringify(payload.old)) as Record<string, string>;
-          removePinnedMessage(oldData.message_id);
+          if (channelId !== channelIdRef.current || !isSubscribedRef.current) return;
+          try {
+            const oldData = JSON.parse(JSON.stringify(payload.old)) as Record<string, string>;
+            removePinnedMessage(oldData.message_id);
+          } catch (err) {
+            console.error('Error handling pinned delete:', err);
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribedRef.current = true;
+        }
+      });
 
     return () => {
+      isSubscribedRef.current = false;
       supabase.removeChannel(channel);
     };
-  }, [channelId, setPinnedMessages, addPinnedMessage, removePinnedMessage]);
+  }, [channelId, fetchPinnedMessages, addPinnedMessage, removePinnedMessage, setPinnedMessages]);
 
   const pinMessage = async (messageId: string, userId: string) => {
-    if (!channelId) return;
+    if (!channelId) return { error: 'No channel selected' };
 
     const { data, error } = await supabase
       .from('pinned_messages')
@@ -74,23 +109,33 @@ export function usePinnedMessages(channelId: string | undefined) {
       `)
       .single();
 
-    if (data && !error) {
+    if (error) {
+      return { error: error.message };
+    }
+
+    if (data) {
       addPinnedMessage(data);
     }
+    return { success: true };
   };
 
   const unpinMessage = async (messageId: string) => {
-    await supabase
+    const { error } = await supabase
       .from('pinned_messages')
       .delete()
       .eq('message_id', messageId);
     
+    if (error) {
+      return { error: error.message };
+    }
+    
     removePinnedMessage(messageId);
+    return { success: true };
   };
 
   const isPinned = (messageId: string) => {
     return pinnedMessages.some(p => p.message_id === messageId);
   };
 
-  return { pinnedMessages, pinMessage, unpinMessage, isPinned };
+  return { pinnedMessages, loading, error, pinMessage, unpinMessage, isPinned };
 }
