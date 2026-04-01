@@ -9,6 +9,7 @@ import { useReactions } from "@/hooks/useReactions";
 import { usePinnedMessages } from "@/hooks/usePinnedMessages";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+import { usePeriodicRefresh } from "@/hooks/usePeriodicRefresh";
 import { useTyping } from "@/hooks/useTyping";
 import { useUpdate } from "@/hooks/useUpdate";
 import { useChallenges } from "@/hooks/useChallenges";
@@ -31,8 +32,8 @@ import { UpdateModal } from "@/components/ui/UpdateModal";
 import { CreateChannelModal } from "@/components/ui/CreateChannelModal";
 import { EditChannelModal } from "@/components/ui/EditChannelModal";
 import { InviteModal } from "@/components/ui/InviteModal";
-import { InviteNotificationModal } from "@/components/ui/InviteNotificationModal";
 import { ChannelMembersModal } from "@/components/ui/ChannelMembersModal";
+import { NotificationModal } from "@/components/ui/NotificationModal";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { CommandPalette, useKeyboardShortcuts } from "@/components/ui/CommandPalette";
 import { KeyboardShortcutsModal } from "@/components/ui/KeyboardShortcutsModal";
@@ -41,13 +42,13 @@ import { ChallengeCompletedToast } from "@/components/ui/ChallengeCompletedToast
 import { BadgeUnlockedToast } from "@/components/ui/BadgeUnlockedToast";
 import { SearchModal } from "@/components/ui/SearchModal";
 import { ChannelDiscoveryModal } from "@/components/ui/ChannelDiscoveryModal";
-import { NotificationModal } from "@/components/ui/NotificationModal";
+
 import AuthScreen from "@/components/ui/AuthScreen";
-import { ChevronDown, ArrowDown, Hash, Search, X, Menu, Command, Trophy, UserPlus, Bell } from "lucide-react";
+import { ChevronDown, ArrowDown, Hash, Search, X, Menu, Command, Trophy, UserPlus, Bell, RefreshCw, Settings, Pin } from "lucide-react";
 
 export default function Home() {
   const { session, allProfiles, myProfile, loading: authLoading } = useAuth();
-  const { channels, activeChannel, lastReadTimestamp, searchQuery, isSearching, setChannels, setActiveChannel, updateLastReadToNow, setSearchQuery, setIsSearching, setReplyTo, showUpdatePopup, dismissedUpdateVersion, setShowSettings } = useChatStore();
+  const { channels, activeChannel, lastReadTimestamps, searchQuery, isSearching, setChannels, setActiveChannel, markChannelRead, setSearchQuery, setIsSearching, setReplyTo, showUpdatePopup, dismissedUpdateVersion, setShowSettings, showKeyboardShortcuts, setShowKeyboardShortcuts } = useChatStore();
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [reactingToMsg, setReactingToMsg] = useState<{id: string, username: string} | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -59,11 +60,23 @@ export default function Home() {
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showChallenges, setShowChallenges] = useState(false);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  
+  // Deduplicating wrapper for notifications
+  const setNotificationsDeduped = useCallback((newNotifications: any[] | ((prev: any[]) => any[])) => {
+    setNotifications((prev) => {
+      const incoming = typeof newNotifications === 'function' ? newNotifications(prev) : newNotifications;
+      const existingIds = new Set(prev.map(n => n.id));
+      const unique = incoming.filter((n: any) => !existingIds.has(n.id));
+      if (unique.length === 0) return prev;
+      return [...unique, ...prev].slice(0, 50);
+    });
+  }, []);
+  
   const [editingChannel, setEditingChannel] = useState<any>(null);
   const [invitingChannel, setInvitingChannel] = useState<any>(null);
   const [viewingMembersChannel, setViewingMembersChannel] = useState<any>(null);
-  const [showInviteNotification, setShowInviteNotification] = useState(false);
   const { confirm: showConfirm, ConfirmComponent: ConfirmModalComponent, config: confirmConfig, close: closeConfirm } = useConfirm();
   const toast = useToast();
 
@@ -75,9 +88,16 @@ export default function Home() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<{ focus: () => void } | null>(null);
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
+  const hasLoadedNotifications = useRef(false);
+  const seenNotificationIds = useRef<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const onlineUsers = usePresence(session?.user?.id);
   const { messages, hasMore, loading, loadingMore, loadMore, deleteMessage } = useChat(activeChannel?.id, session?.user?.id);
+  const unreadCount = messages.filter(
+    (m) => m.user_id !== session?.user?.id &&
+    new Date(m.created_at) > new Date(lastReadTimestamps[activeChannel?.id || ''] || '1970-01-01')
+  ).length;
   const { typingUsers, startTyping, stopTyping } = useTyping(session?.user?.id, myProfile?.username);
   const { update: updateInfo, checkForUpdates } = useUpdate();
   
@@ -97,13 +117,11 @@ export default function Home() {
   } = useChallenges(session?.user?.id);
   
   const { 
-    pendingInvites, 
     sentInvites,
     sendInvite, 
     acceptInvite, 
     declineInvite,
     checkUserInvited,
-    refreshInvites 
   } = useInvites(session?.user?.id);
   
   const { 
@@ -138,11 +156,11 @@ export default function Home() {
     setShowProfile(false);
     setShowCreateChannel(false);
     setShowCommandPalette(false);
-    setShowShortcuts(false);
+    setShowKeyboardShortcuts(false);
     setEditingChannel(null);
     setInvitingChannel(null);
     setViewingMembersChannel(null);
-  }, []);
+  }, [setShowKeyboardShortcuts]);
 
   useKeyboardShortcuts({
     onOpenCommandPalette: () => setShowCommandPalette(true),
@@ -155,6 +173,7 @@ export default function Home() {
     onSendMessage: () => {
       messageInputRef.current?.focus();
     },
+    onOpenShortcuts: () => setShowKeyboardShortcuts(true),
   });
   
   useEffect(() => {
@@ -171,12 +190,6 @@ export default function Home() {
   }, [session, checkForUpdates, trackLogin]);
   
   useEffect(() => {
-    if (pendingInvites.length > 0 && !showInviteNotification) {
-      setShowInviteNotification(true);
-    }
-  }, [pendingInvites.length, showInviteNotification]);
-  
-  useEffect(() => {
     const handleVisibilityChange = () => {
       useChatStore.getState().setIsTabVisible(!document.hidden);
     };
@@ -189,6 +202,89 @@ export default function Home() {
   const { pinMessage, unpinMessage, isPinned } = usePinnedMessages(activeChannel?.id);
   const { checkForMention, checkForNewMessage } = useNotifications(session?.user?.id, myProfile?.username);
   useRealtimeNotifications(session?.user?.id);
+
+  const { refresh: performRefresh } = usePeriodicRefresh({
+    userId: session?.user?.id,
+    channels,
+    activeChannel,
+    onRefreshChannels: setChannels,
+    onRefreshActiveChannel: setActiveChannel,
+    onRefreshMemberCounts: setMemberCounts,
+    onRefreshNotifications: setNotificationsDeduped,
+  });
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    let isMounted = true;
+    let hasAddedRealtime = false;
+
+    const fetchNotifications = async () => {
+      const { data } = await supabase
+        .from('user_notifications')
+        .select(`
+          *,
+          inviter:profiles!inviter_id(id, username, avatar_url, avatar_effect),
+          channel:channels(id, name, description, color, emoji)
+        `)
+        .eq('user_id', session?.user?.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (data && isMounted) {
+        seenNotificationIds.current = new Set(data.map((n: any) => n.id));
+        setNotifications(data);
+        hasLoadedNotifications.current = true;
+        hasAddedRealtime = false;
+      }
+    };
+
+    fetchNotifications();
+
+    const notifSub = supabase
+      .channel('user-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'user_notifications',
+        filter: `user_id=eq.${session?.user?.id}`,
+      }, async (payload: any) => {
+        if (!isMounted) return;
+        
+        const n = payload.new;
+        
+        const { data: fullNotif } = await supabase
+          .from('user_notifications')
+          .select(`
+            *,
+            inviter:profiles!inviter_id(id, username, avatar_url, avatar_effect),
+            channel:channels(id, name, description, color, emoji)
+          `)
+          .eq('id', n.id)
+          .single();
+        
+        if (fullNotif && isMounted) {
+          if (seenNotificationIds.current.has(n.id)) return;
+          seenNotificationIds.current.add(n.id);
+          
+          setNotifications((prev: any[]) => {
+            if (prev.some(existing => existing.id === n.id)) return prev;
+            hasAddedRealtime = true;
+            return [fullNotif, ...prev];
+          });
+          
+          if (n.type === 'invite') {
+            toast.info('New channel invitation! Tap the bell icon to view.');
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(notifSub);
+    };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!messages.length || !activeChannel?.name) return;
@@ -258,21 +354,6 @@ export default function Home() {
     };
 
     fetchMemberCounts();
-
-    const channel = supabase
-      .channel('member-count-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'channel_members',
-      }, () => {
-        fetchMemberCounts();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [channels.length]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -293,7 +374,7 @@ export default function Home() {
     } else {
       scrollToBottom("smooth");
     }
-    updateLastReadToNow();
+    if (activeChannel?.id) markChannelRead(activeChannel.id);
   };
 
   useEffect(() => {
@@ -507,51 +588,63 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowNotifications(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all relative"
+                  title="Notifications"
+                >
+                  <Bell size={16} />
+                  {notifications.filter((n: any) => n.type === 'invite').length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center">
+                      {notifications.filter((n: any) => n.type === 'invite').length > 9 ? '9+' : notifications.filter((n: any) => n.type === 'invite').length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowPinnedMessages(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all relative"
+                  title="Pinned Messages"
+                >
+                  <Pin size={16} />
+                </button>
+                <button
+                  onClick={() => setShowSearch(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                  title="Search (Ctrl+K)"
+                >
+                  <Search size={16} />
+                </button>
+                <button
+                  onClick={() => setShowChallenges(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all relative"
+                  title="Challenges"
+                >
+                  <Trophy size={16} />
+                  {completedCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center">
+                      {completedCount}
+                    </span>
+                  )}
+                </button>
+              <div className="w-px h-4 bg-white/10 mx-1" />
               <button
-                onClick={() => setShowNotifications(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all relative"
-                title="Notifications"
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  await performRefresh();
+                  setIsRefreshing(false);
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                title="Refresh"
               >
-                <Bell size={16} />
-                {pendingInvites.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center">
-                    {pendingInvites.length > 9 ? '9+' : pendingInvites.length}
-                  </span>
-                )}
+                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
               <button
-                onClick={() => setShowSearch(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
-                title="Search messages"
+                onClick={() => setShowSettings(true)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                title="Settings"
               >
-                <Search size={16} />
-              </button>
-              <button
-                onClick={() => setShowShortcuts(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
-                title="Keyboard shortcuts"
-              >
-                <Command size={16} />
-              </button>
-              <button
-                onClick={() => setShowChallenges(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all relative"
-                title="Challenges"
-              >
-                <Trophy size={16} />
-                {completedCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center">
-                    {completedCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setShowCommandPalette(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-800/50 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
-                title="Command palette (Ctrl+K)"
-              >
-                <kbd className="text-[10px] font-bold">⌘K</kbd>
+                <Settings size={16} />
               </button>
               {isSearching && (
                 <div className="absolute right-0 top-12 w-72 animate-scale-in">
@@ -624,12 +717,12 @@ export default function Home() {
                 {messages.map((msg, index) => {
                   const prevMsg = messages[index - 1];
                   const isNew =
-                    new Date(msg.created_at) > new Date(lastReadTimestamp);
+                    new Date(msg.created_at) > new Date(lastReadTimestamps[activeChannel?.id || ''] || '1970-01-01');
                   const isFirstNew =
                     isNew &&
                     (index === 0 ||
                       new Date(messages[index - 1].created_at) <=
-                        new Date(lastReadTimestamp));
+                        new Date(lastReadTimestamps[activeChannel?.id || ''] || '1970-01-01'));
 
                   const isSameUser = prevMsg && prevMsg.user_id === msg.user_id;
                   const isWithinTime =
@@ -657,6 +750,7 @@ export default function Home() {
                         onReply={handleReply}
                         searchQuery={searchQuery}
                         myUsername={myProfile?.username}
+                        allProfiles={allProfiles}
                       />
                     </div>
                   );
@@ -666,32 +760,26 @@ export default function Home() {
             )}
           </div>
 
-          <div className="absolute bottom-24 right-6 flex flex-col items-end gap-3 pointer-events-none z-30">
-            {messages.some(
-              (m) =>
-                m.user_id !== session?.user?.id &&
-                new Date(m.created_at) > new Date(lastReadTimestamp),
-            ) && (
-              <button
-                onClick={jumpToNew}
-                className="pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 backdrop-blur-xl hover:bg-red-500/20 transition-all duration-300 shadow-lg shadow-red-500/10 animate-slide-up"
-              >
-                <span className="text-[10px] font-bold uppercase tracking-widest">
-                  Jump to New
-                </span>
-                <ChevronDown size={12} />
-              </button>
-            )}
-
+          <div className="absolute bottom-24 right-6 pointer-events-none z-30">
             {showScrollButton && (
               <button
-                onClick={() => {
-                  scrollToBottom("smooth");
-                  updateLastReadToNow();
-                }}
-                className="pointer-events-auto flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-110 active:scale-95 transition-all duration-300 animate-slide-up"
+                onClick={jumpToNew}
+                className="pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-full backdrop-blur-xl transition-all duration-300 animate-slide-up shadow-lg ${
+                  unreadCount > 0
+                    ? 'bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 shadow-red-500/10'
+                    : 'bg-indigo-600/90 text-white hover:bg-indigo-500 shadow-indigo-500/30'
+                }"
               >
-                <ArrowDown size={18} />
+                {unreadCount > 0 ? (
+                  <>
+                    <span className="text-[10px] font-bold">
+                      {unreadCount > 99 ? '99+' : unreadCount} new
+                    </span>
+                    <ChevronDown size={12} />
+                  </>
+                ) : (
+                  <ArrowDown size={16} />
+                )}
               </button>
             )}
           </div>
@@ -751,7 +839,6 @@ export default function Home() {
         <RightSidebar 
           allProfiles={allProfiles} 
           onlineUsers={onlineUsers}
-          onJumpToMessage={handleJumpToMessage}
         />
 
         {showMobileSidebar && (
@@ -851,10 +938,7 @@ export default function Home() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenProfile={() => setShowProfile(true)}
         />
-        <KeyboardShortcutsModal
-          open={showShortcuts}
-          onClose={() => setShowShortcuts(false)}
-        />
+        <KeyboardShortcutsModal />
         <ChallengesModal
           open={showChallenges}
           onClose={() => setShowChallenges(false)}
@@ -876,7 +960,7 @@ export default function Home() {
             onlineUsers={onlineUsers}
             currentUserId={session?.user?.id}
             invitedUserIds={sentInvites
-              .filter((i) => i.channel_id === invitingChannel.id)
+              .filter((i) => i.channel_id === invitingChannel.id && i.status === 'pending')
               .map((i) => i.invited_user_id)}
             onInvite={async (userId) => {
               return sendInvite(invitingChannel.id, userId);
@@ -884,33 +968,6 @@ export default function Home() {
             onClose={() => setInvitingChannel(null)}
           />
         )}
-        <InviteNotificationModal
-          invites={pendingInvites}
-          onlineUsers={onlineUsers}
-          onAccept={async (invite) => {
-            const result = await acceptInvite(invite);
-            if (result.success) {
-              await supabase.from("channel_members").insert({
-                channel_id: invite.channel_id,
-                user_id: session?.user?.id,
-                role: "member",
-              });
-              
-              const inviterProfile = invite.inviter?.username || "Someone";
-              await supabase.from("messages").insert({
-                channel_id: invite.channel_id,
-                user_id: session?.user?.id,
-                text: `joined the channel`,
-                is_system: true,
-              });
-              refreshInvites();
-              refreshMembers?.();
-            }
-            return result;
-          }}
-          onDecline={declineInvite}
-          onClose={() => setShowInviteNotification(false)}
-        />
         {viewingMembersChannel && (
           <ChannelMembersModal
             channel={viewingMembersChannel}
@@ -945,8 +1002,16 @@ export default function Home() {
                   });
                   setViewingMembersChannel(null);
                   if (activeChannel?.id === viewingMembersChannel.id) {
-                    setActiveChannel(null);
+                    const currentChannels = useChatStore.getState().channels;
+                    const otherChannel = currentChannels.find(c => c.id !== viewingMembersChannel.id && c.slug === 'general') 
+                      || currentChannels.find(c => c.id !== viewingMembersChannel.id);
+                    if (otherChannel) {
+                      setActiveChannel(otherChannel);
+                    }
                   }
+                  useChatStore.getState().setChannels(
+                    useChatStore.getState().channels.filter(c => c.id !== viewingMembersChannel.id)
+                  );
                 }
                 return result;
               }
@@ -972,45 +1037,51 @@ export default function Home() {
         />
         <NotificationModal
           open={showNotifications}
-          notifications={pendingInvites.map((invite) => ({
-            id: invite.id,
-            type: 'invite' as const,
-            title: 'Channel Invitation',
-            message: `${invite.inviter?.username || 'Someone'} invited you to #${invite.channel?.name || 'a channel'}`,
-            timestamp: invite.created_at,
-            read: false,
+          notifications={notifications.map((n: any) => ({
+            id: n.id,
+            type: n.type,
+            title: n.title,
+            message: n.message || n.body,
+            timestamp: n.timestamp || n.created_at,
+            read: n.read || false,
             data: {
-              channelId: invite.channel_id,
-              channelName: invite.channel?.name,
-              inviterName: invite.inviter?.username,
+              channelId: n.channel_id,
             },
           }))}
           onClose={() => setShowNotifications(false)}
-          onAcceptInvite={async (inviteId) => {
-            const invite = pendingInvites.find(i => i.id === inviteId);
-            if (invite) {
-              await acceptInvite(invite);
-              await supabase.from('channel_members').insert({
-                channel_id: invite.channel_id,
-                user_id: session?.user?.id,
-                role: 'member',
-              });
-              await supabase.from('messages').insert({
-                channel_id: invite.channel_id,
-                user_id: session?.user?.id,
-                text: 'joined the channel',
-                is_system: true,
-              });
-              refreshInvites();
+          onAcceptInvite={async (notificationId) => {
+            const notif = notifications.find((n: any) => n.id === notificationId);
+            if (notif?.channel_id) {
+              const { data: inviteData } = await supabase
+                .from('channel_invites')
+                .select('*')
+                .eq('channel_id', notif.channel_id)
+                .eq('invited_user_id', session?.user?.id)
+                .eq('status', 'pending')
+                .single();
+              
+              if (inviteData) {
+                await supabase.from('channel_invites').update({ status: 'accepted' }).eq('id', inviteData.id);
+                await supabase.from('channel_members').insert({
+                  channel_id: notif.channel_id,
+                  user_id: session?.user?.id,
+                  role: 'member',
+                });
+                await supabase.from('messages').insert({
+                  channel_id: notif.channel_id,
+                  user_id: session?.user?.id,
+                  text: 'joined the channel',
+                  is_system: true,
+                });
+                await supabase.from('user_notifications').delete().eq('id', notificationId);
+              }
+              setNotifications((prev: any[]) => prev.filter((n: any) => n.id !== notificationId));
               refreshMembers?.();
             }
           }}
-          onDeclineInvite={async (inviteId) => {
-            const invite = pendingInvites.find(i => i.id === inviteId);
-            if (invite) {
-              await declineInvite(invite);
-              refreshInvites();
-            }
+          onDeclineInvite={async (notificationId) => {
+            await supabase.from('user_notifications').delete().eq('id', notificationId);
+            setNotifications((prev: any[]) => prev.filter((n: any) => n.id !== notificationId));
           }}
           onViewChannel={(channelId) => {
             const channel = channels.find(c => c.id === channelId);
@@ -1019,10 +1090,83 @@ export default function Home() {
               setShowNotifications(false);
             }
           }}
-          onClearAll={() => {
+          onClearAll={async () => {
+            const notificationIds = notifications.map((n: any) => n.id);
+            if (notificationIds.length > 0) {
+              await supabase.from('user_notifications').delete().in('id', notificationIds);
+            }
+            setNotifications([]);
             setShowNotifications(false);
           }}
         />
+
+        {showPinnedMessages && (
+          <PinnedMessagesModal
+            onClose={() => setShowPinnedMessages(false)}
+            onJumpToMessage={(messageId) => {
+              handleJumpToMessage(messageId);
+              setShowPinnedMessages(false);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PinnedMessagesModal({ onClose, onJumpToMessage }: { onClose: () => void; onJumpToMessage: (messageId: string) => void }) {
+  const { pinnedMessages } = useChatStore();
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="relative w-full max-w-md animate-scale-in max-h-[70vh] flex flex-col">
+        <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <Pin size={16} className="text-indigo-400" />
+              <h2 className="text-sm font-semibold text-white">Pinned Messages</h2>
+              <span className="text-[10px] text-zinc-500">({pinnedMessages.length})</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-white/5 rounded text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="overflow-y-auto custom-scrollbar">
+            {pinnedMessages.length === 0 ? (
+              <div className="p-8 text-center">
+                <Pin size={32} className="mx-auto text-zinc-700 mb-2" />
+                <p className="text-xs text-zinc-500">No pinned messages</p>
+              </div>
+            ) : (
+              <div className="p-2 space-y-2">
+                {pinnedMessages.map((pinned) => {
+                  const msg = pinned.message as { text?: string; profiles?: { username?: string } } | null;
+                  return (
+                    <div
+                      key={pinned.id}
+                      className="p-3 bg-zinc-900/50 hover:bg-zinc-800/50 border border-white/5 hover:border-white/10 rounded-lg cursor-pointer transition-all"
+                      onClick={() => onJumpToMessage(pinned.message_id)}
+                    >
+                      <p className="text-[10px] font-semibold text-indigo-400 mb-1">
+                        {msg?.profiles?.username || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-zinc-400 line-clamp-2">
+                        {msg?.text || 'Message not found'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -56,7 +56,7 @@ export function useSearch(filters: SearchFilters) {
           created_at,
           channel_id,
           user_id,
-          profiles:user_id(id, username, avatar_url),
+          profiles:user_id(id, username, avatar_url, font_style, text_color),
           channel:channel_id(id, name)
         `)
         .ilike('text', `%${filters.query}%`)

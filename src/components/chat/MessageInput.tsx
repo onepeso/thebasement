@@ -101,11 +101,6 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
       return; // Toast already shown by useSpamProtection
     }
 
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    onStopTyping?.();
-
     const insertData: Record<string, string> = {
       text: input,
       channel_id: channelId,
@@ -145,20 +140,18 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
     <form onSubmit={handleSendMessage} className="px-4 pb-4 shrink-0 relative">
       {showMentions && filteredMentions.length > 0 && (
         <div className="absolute bottom-full left-4 mb-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden w-56 z-50 animate-scale-in">
-          <div className="text-[10px] font-bold text-zinc-500 p-2.5 border-b border-white/5 uppercase bg-black/20 tracking-widest flex items-center gap-2">
-            <AtSign size={10} /> Mention User
+          <div className="text-[10px] font-semibold text-zinc-500 p-2 border-b border-white/5 flex items-center gap-1.5">
+            <AtSign size={10} /> Mention
           </div>
-          <div className="max-h-48 overflow-y-auto custom-scrollbar">
-            {filteredMentions.map((p: any) => (
+          <div className="max-h-40 overflow-y-auto">
+            {filteredMentions.slice(0, 5).map((p: any) => (
               <div
                 key={p.id}
                 onClick={() => insertMention(p.username)}
-                className="flex items-center gap-2.5 p-2.5 hover:bg-indigo-600/80 cursor-pointer transition-all group"
+                className="flex items-center gap-2 p-2 hover:bg-indigo-500/20 cursor-pointer transition-colors"
               >
                 <AvatarWithEffect profile={p} size="sm" showStatus={false} />
-                <span className="text-xs font-semibold text-zinc-300 group-hover:text-white">
-                  {p.username}
-                </span>
+                <span className="text-xs text-zinc-300">{p.username}</span>
               </div>
             ))}
           </div>
@@ -166,27 +159,26 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
       )}
 
       {replyTo && (
-        <div className="mb-2 p-2.5 bg-zinc-800/50 border border-white/5 rounded-xl animate-fade-in">
-          <div className="flex items-center gap-2">
-            <Reply size={12} className="text-indigo-400 shrink-0" />
-            <span className="text-[10px] font-medium text-indigo-400 cursor-default">Reply to {replyTo.username}</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-indigo-500/50 to-transparent" />
+        <div className="mb-2 p-2 bg-zinc-800/30 border border-white/5 rounded-xl animate-fade-in">
+          <div className="flex items-center gap-2 text-[10px] text-indigo-400">
+            <Reply size={10} />
+            <span>Replying to {replyTo.username}</span>
           </div>
-          <p className="text-xs text-zinc-400 mt-1.5 ml-4 line-clamp-1 cursor-default">{replyTo.text}</p>
+          <p className="text-xs text-zinc-500 mt-1 line-clamp-1">{replyTo.text}</p>
         </div>
       )}
 
       {isRateLimited && (
-        <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center gap-2 animate-fade-in">
-          <Clock size={14} className="text-red-400" />
-          <span className="text-xs font-medium text-red-400">
-            Slow down! You can send again in {cooldownSeconds} seconds
+        <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 animate-fade-in">
+          <Clock size={12} className="text-red-400" />
+          <span className="text-xs text-red-400">
+            Slow down! {cooldownSeconds}s
           </span>
         </div>
       )}
 
-      <div className="bg-zinc-800/50 rounded-2xl px-4 py-3 border border-white/5 focus-within:border-indigo-500/50 focus-within:bg-zinc-800/70 transition-all shadow-inner">
-        <div className="flex items-center gap-3">
+      <div className="bg-zinc-800/30 rounded-xl px-3 py-2.5 border border-white/5 focus-within:border-indigo-500/30 transition-all">
+        <div className="flex items-center gap-2">
           <input
             ref={inputRef}
             type="text"
@@ -194,14 +186,14 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 bg-transparent w-full outline-none text-sm text-zinc-100 placeholder-zinc-600"
+            className="flex-1 bg-transparent w-full outline-none text-sm text-zinc-100 placeholder:text-zinc-600"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/30 cursor-pointer"
+            className="p-1.5 rounded-lg bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
-            <Send size={16} />
+            <Send size={14} />
           </button>
         </div>
       </div>

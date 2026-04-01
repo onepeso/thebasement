@@ -4,12 +4,15 @@ import { useChatStore } from '@/store/useChatStore';
 import { useToast } from '@/store/useToastStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpdate } from '@/hooks/useUpdate';
-import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star } from 'lucide-react';
+import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star, Type } from 'lucide-react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getVersion } from '@tauri-apps/api/app';
 import type { UserStatus, BadgeWithStatus } from '@/types/database';
+import { FONT_STYLES, TEXT_COLORS } from '@/types/database';
+import { getUsernameStyle } from '@/utils/fontStyles';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import type { FontStyleId, TextColorId } from '@/types/database';
 
 const AVATAR_SEEDS = ['cool', 'tech', 'gamer', 'bit', 'shade', 'neo', 'pixel', 'basement', 'vapor', 'retro', 'funky', 'bottts'];
 
@@ -173,6 +176,8 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
   const [editEffect, setEditEffect] = useState<string>('none');
   const [editOverlay, setEditOverlay] = useState<string>('none');
   const [editOverlayUrl, setEditOverlayUrl] = useState<string | null>(null);
+  const [editFontStyle, setEditFontStyle] = useState<FontStyleId>('default');
+  const [editTextColor, setEditTextColor] = useState<TextColorId>('default');
   const [notifPermission, setNotifPermission] = useState(false);
   const [appVersion, setAppVersion] = useState('1.0.0');
   const [highlightedBadges, setHighlightedBadges] = useState<string[]>([]);
@@ -189,6 +194,8 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
       setEditEffect(myProfile.avatar_effect || 'none');
       setEditOverlay(myProfile.avatar_overlays || 'none');
       setEditOverlayUrl(myProfile.avatar_overlay_url || null);
+      setEditFontStyle(myProfile.font_style || 'default');
+      setEditTextColor(myProfile.text_color || 'default');
       setHighlightedBadges(myProfile.highlighted_badges || []);
       setActiveTab('profile');
     }
@@ -221,6 +228,8 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
       avatar_effect: editEffect === 'none' ? null : editEffect,
       avatar_overlays: editOverlay === 'none' ? null : editOverlay,
       highlighted_badges: highlightedBadges,
+      font_style: editFontStyle === 'default' ? null : editFontStyle,
+      text_color: editTextColor === 'default' ? null : editTextColor,
     };
     if (editOverlayUrl) updates.avatar_overlay_url = editOverlayUrl;
     else updates.avatar_overlay_url = null;
@@ -311,19 +320,12 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in" onClick={(e) => e.target === e.currentTarget && setShowSettings(false)}>
-      <div className="relative w-full max-w-4xl h-[600px] animate-scale-in flex">
-        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-indigo-500/20 rounded-3xl blur-xl" />
-        
-        <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl text-white overflow-hidden flex w-full">
+      <div className="relative w-full max-w-4xl h-[580px] animate-scale-in flex">
+        <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl text-white overflow-hidden flex w-full">
           {/* Vertical Sidebar */}
-          <div className="w-48 border-r border-white/5 flex flex-col shrink-0">
-            <div className="p-4 border-b border-white/5">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-600/20 rounded-lg">
-                  <User size={16} className="text-indigo-400" />
-                </div>
-                <span className="text-sm font-bold">Settings</span>
-              </div>
+          <div className="w-40 border-r border-white/5 flex flex-col shrink-0">
+            <div className="h-12 flex items-center px-4 border-b border-white/5">
+              <span className="text-sm font-semibold">Settings</span>
             </div>
             <nav className="flex-1 py-2">
               {SIDEBAR_TABS.map(tab => {
@@ -332,13 +334,13 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all ${
+                    className={`w-full flex items-center gap-2 px-4 py-2 text-[13px] transition-all ${
                       activeTab === tab.id
                         ? 'text-white bg-white/5 border-r-2 border-indigo-500'
                         : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'
                     }`}
                   >
-                    <Icon size={16} />
+                    <Icon size={14} />
                     <span>{tab.label}</span>
                     {tab.id === 'gamification' && (
                       <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">
@@ -353,39 +355,78 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
 
           {/* Content Area */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-white/5 shrink-0">
-              <h2 className="text-lg font-bold capitalize">{activeTab}</h2>
-              <button onClick={() => setShowSettings(false)} className="p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                <X size={18} />
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
+              <h2 className="text-base font-semibold capitalize">{activeTab}</h2>
+              <button onClick={() => setShowSettings(false)} className="p-1.5 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                <X size={16} />
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
               {/* Profile Tab */}
               {activeTab === 'profile' && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="space-y-4 animate-fade-in">
                   <div>
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block mb-2">Username</label>
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Username</label>
                     <input 
-                      className="w-full bg-zinc-900/80 p-3 rounded-xl outline-none border border-white/5 focus:border-indigo-500/50 text-sm transition-all" 
+                      className="w-full bg-zinc-900/80 p-2.5 rounded-lg outline-none border border-white/5 focus:border-indigo-500/50 text-sm transition-all" 
                       value={editUsername} onChange={(e) => setEditUsername(e.target.value)} 
                       placeholder="Enter username..."
                     />
+                    <div className="mt-2 flex items-center gap-2">
+                      <Type size={10} className="text-zinc-600" />
+                      <span className="text-[10px] text-zinc-600">
+                        Preview: <span style={{ ...getUsernameStyle(editFontStyle), color: TEXT_COLORS.find(c => c.id === editTextColor)?.color || '#818cf8' }}>{editUsername || 'Username'}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Text Color</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TEXT_COLORS.map(color => (
+                        <button
+                          key={color.id}
+                          onClick={() => setEditTextColor(color.id as TextColorId)}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${editTextColor === color.id ? 'ring-2 ring-white ring-offset-1 ring-offset-zinc-900' : 'hover:scale-110'}`}
+                          style={{ backgroundColor: color.color }}
+                          title={color.name}
+                        >
+                          {color.id === 'default' && <div className="w-4 h-4 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Font Style</label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {FONT_STYLES.map(font => (
+                        <button
+                          key={font.id}
+                          onClick={() => setEditFontStyle(font.id as FontStyleId)}
+                          className={`px-3 py-2 rounded-lg text-xs transition-all ${editFontStyle === font.id ? 'bg-indigo-600/30 border border-indigo-500/50' : 'bg-zinc-900/50 border border-transparent hover:border-white/10'}`}
+                          style={getUsernameStyle(font.id)}
+                        >
+                          {font.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Avatar Tab */}
               {activeTab === 'avatar' && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="space-y-4 animate-fade-in">
                   <div>
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block mb-3">Choose Avatar</label>
-                    <div className="grid grid-cols-6 gap-2">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Avatar</label>
+                    <div className="grid grid-cols-6 gap-1.5">
                       {AVATAR_SEEDS.map(s => {
                         const url = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${s}`;
                         return (
                           <button key={s} onClick={() => setEditAvatar(url)}
-                            className={`relative aspect-square rounded-xl overflow-hidden transition-all cursor-pointer ${editAvatar === url ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-zinc-950 scale-105' : 'hover:scale-105 hover:ring-1 hover:ring-white/20'}`}>
+                            className={`relative aspect-square rounded-lg overflow-hidden transition-all cursor-pointer ${editAvatar === url ? 'ring-2 ring-indigo-500 scale-105' : 'hover:ring-1 hover:ring-white/20'}`}>
                             <img src={url} className="w-full h-full object-cover bg-zinc-800" alt="" />
                           </button>
                         );
@@ -394,30 +435,27 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
                   </div>
                   
                   <div>
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block mb-3">Avatar Effects</label>
-                    <div className="grid grid-cols-4 gap-3">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Effects</label>
+                    <div className="flex gap-2">
                       {EFFECTS.map(effect => (
                         <button key={effect.id} onClick={() => setEditEffect(effect.id)}
-                          className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all cursor-pointer ${editEffect === effect.id ? 'bg-indigo-600/20 border-2 border-indigo-500/50' : 'bg-zinc-900/50 border border-transparent hover:border-white/10'}`}>
-                          <div className="w-14 h-14 flex items-center justify-center">{effect.preview()}</div>
-                          <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-tight">{effect.name}</span>
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${editEffect === effect.id ? 'bg-indigo-600/20 border border-indigo-500/50 text-indigo-400' : 'bg-zinc-900/50 border border-transparent hover:border-white/10 text-zinc-400'}`}>
+                          {effect.name}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block mb-3">Avatar Overlays</label>
-                    <div className="grid grid-cols-4 gap-3">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Overlays</label>
+                    <div className="flex flex-wrap gap-1.5">
                       {OVERLAYS.map(overlay => {
                         const Icon = overlay.icon as (props: any) => ReactNode;
                         return (
                           <button key={overlay.id} onClick={() => setEditOverlay(overlay.id)}
-                            className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all cursor-pointer ${editOverlay === overlay.id ? 'bg-indigo-600/20 border-2 border-indigo-500/50' : 'bg-zinc-900/50 border border-transparent hover:border-white/10'}`}>
-                            <div className="w-14 h-14 flex items-center justify-center">
-                              {overlay.id === 'none' ? <div className="w-14 h-14 rounded-full bg-zinc-800" /> : <Icon />}
-                            </div>
-                            <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-tight">{overlay.name}</span>
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${editOverlay === overlay.id ? 'bg-indigo-600/20 border border-indigo-500/50 text-indigo-400' : 'bg-zinc-900/50 border border-transparent hover:border-white/10 text-zinc-400'}`}>
+                            {overlay.id === 'none' ? <X size={12} /> : <Icon />}
+                            {overlay.name}
                           </button>
                         );
                       })}
@@ -425,40 +463,21 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block mb-3">Image Overlays</label>
-                    <div className="grid grid-cols-5 gap-2">
-                      {IMAGE_OVERLAYS.map(overlay => (
-                        <button key={overlay.id} onClick={() => { setEditOverlayUrl(overlay.url); if (overlay.id !== 'none') setEditOverlay('none'); }}
-                          className={`relative flex flex-col items-center gap-1 p-2 rounded-xl transition-all cursor-pointer ${editOverlayUrl === overlay.url && overlay.id !== 'none' ? 'bg-indigo-600/20 border-2 border-indigo-500/50' : 'bg-zinc-900/50 border border-transparent hover:border-white/10'}`}>
-                          {overlay.id === 'none' ? (
-                            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center"><X size={16} className="text-zinc-600" /></div>
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden">
-                              <img src={overlay.url || ''} alt={overlay.name} className="w-10 h-10 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            </div>
-                          )}
-                          <span className="text-[8px] font-medium text-zinc-500 uppercase tracking-tight text-center">{overlay.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block mb-3">Preview</label>
-                    <div className="flex items-center justify-center p-8 bg-zinc-900/30 rounded-xl border border-white/5">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase block mb-2">Preview</label>
+                    <div className="flex items-center justify-center p-6 bg-zinc-900/30 rounded-lg border border-white/5">
                       <div className="relative">
                         {(editAvatar || myProfile?.avatar_url) ? (
                           <div className="relative inline-block">
                             {editEffect === 'fire' && (
-                              <><div className="absolute inset-0 rounded-full animate-pulse bg-gradient-to-b from-orange-500 via-red-500 to-transparent blur-md opacity-75" /><div className="absolute inset-0 rounded-full animate-ping bg-gradient-to-b from-yellow-400 to-red-500 opacity-30" /></>
+                              <><div className="absolute inset-0 rounded-full animate-pulse bg-gradient-to-b from-orange-500 via-red-500 to-transparent blur-md opacity-75" /></>
                             )}
-                            {editEffect === 'basketball' && <div className="absolute -inset-3 rounded-full"><div className="w-full h-full rounded-full border-4 border-orange-500 animate-spin" style={{ animationDuration: '3s' }} /></div>}
+                            {editEffect === 'basketball' && <div className="absolute -inset-2 rounded-full"><div className="w-full h-full rounded-full border-4 border-orange-500 animate-spin" style={{ animationDuration: '3s' }} /></div>}
                             {editOverlayUrl ? (
-                              <><img src={editAvatar || myProfile?.avatar_url} className="w-24 h-24 rounded-full object-cover" alt="" /><div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10"><img src={editOverlayUrl} className="w-14 h-14 sm:w-16 sm:h-16 object-contain" alt="overlay" /></div></>
+                              <><img src={editAvatar || myProfile?.avatar_url} className="w-20 h-20 rounded-full object-cover" alt="" /><div className="absolute -top-1 left-1/2 -translate-x-1/2 z-10"><img src={editOverlayUrl} className="w-12 h-12 object-contain" alt="overlay" /></div></>
                             ) : renderOverlayPreview(editOverlay)}
                           </div>
                         ) : (
-                          <div className="w-24 h-24 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600">No avatar</div>
+                          <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600">No avatar</div>
                         )}
                       </div>
                     </div>
@@ -468,63 +487,43 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
 
               {/* Status Tab */}
               {activeTab === 'status' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="grid grid-cols-4 gap-3">
+                <div className="space-y-3 animate-fade-in">
+                  <div className="flex gap-2">
                     {STATUS_OPTIONS.map(status => (
                       <button key={status.value} onClick={() => setEditStatus(status.value)}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all cursor-pointer ${editStatus === status.value ? 'bg-zinc-800/80 ring-2 ring-indigo-500/50' : 'bg-zinc-900/50 hover:bg-zinc-800/50 border border-transparent hover:border-white/5'}`}>
-                        <div className="relative">
-                          <div className={`w-5 h-5 rounded-full ${status.bgColor}`} />
-                          {editStatus === status.value && <Circle size={10} className="absolute -bottom-0.5 -right-0.5 text-white fill-current" />}
-                        </div>
-                        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-tighter text-center">{status.label}</span>
+                        className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${editStatus === status.value ? 'bg-zinc-800/80 ring-2 ring-indigo-500/50' : 'bg-zinc-900/50 hover:bg-zinc-800/50 border border-transparent'}`}>
+                        <div className={`w-3 h-3 rounded-full ${status.bgColor}`} />
+                        <span className="text-zinc-400">{status.label}</span>
                       </button>
                     ))}
-                  </div>
-                  <div className="p-4 bg-zinc-900/30 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${editStatus === 'online' ? 'bg-emerald-500' : editStatus === 'away' ? 'bg-yellow-500' : editStatus === 'busy' ? 'bg-red-500' : 'bg-red-600'}`} />
-                      <div>
-                        <div className="text-sm font-semibold text-zinc-200">{STATUS_OPTIONS.find(s => s.value === editStatus)?.label || 'Online'}</div>
-                        <div className="text-[10px] text-zinc-500">
-                          {editStatus === 'online' && 'You appear online to others'}
-                          {editStatus === 'away' && "You're away from your device"}
-                          {editStatus === 'busy' && 'You are busy'}
-                          {editStatus === 'dnd' && 'Do not disturb - no interruptions'}
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
 
               {/* Notifications Tab */}
               {activeTab === 'notifications' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="flex items-center gap-3 p-4 bg-zinc-900/50 rounded-xl border border-white/5">
-                    <div className="p-2 rounded-lg bg-zinc-800">
-                      {notifPermission ? <Bell size={18} className="text-emerald-400" /> : <Bell size={18} className="text-zinc-500" />}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold text-zinc-200">Desktop Notifications</div>
-                      <div className={`text-xs ${notifPermission ? 'text-emerald-400/80' : 'text-zinc-500'}`}>{notifPermission ? 'Enabled' : 'Disabled'}</div>
+                <div className="space-y-3 animate-fade-in">
+                  <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-lg border border-white/5">
+                    <Bell size={16} className={notifPermission ? 'text-emerald-400' : 'text-zinc-500'} />
+                    <div className="flex-1 text-xs">
+                      <div className="text-zinc-200">Desktop Notifications</div>
+                      <div className={notifPermission ? 'text-emerald-400/80' : 'text-zinc-500'}>{notifPermission ? 'Enabled' : 'Disabled'}</div>
                     </div>
                     {!notifPermission ? (
-                      <button onClick={handleRequestPermission} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer">Enable</button>
+                      <button onClick={handleRequestPermission} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg cursor-pointer">Enable</button>
                     ) : (
-                      <button onClick={handleTestNotification} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors border border-white/5 cursor-pointer">Test</button>
+                      <button onClick={handleTestNotification} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg cursor-pointer">Test</button>
                     )}
                   </div>
                   {notifPermission && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex gap-2">
                       <button onClick={() => toggleNotificationSetting('mentions')}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all cursor-pointer ${notificationSettings.mentions ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-400' : 'bg-zinc-900/50 border border-transparent text-zinc-500 hover:border-white/5'}`}>
-                        <AtSign size={18} /><span className="text-[10px] font-medium uppercase tracking-tight">Mentions</span>
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${notificationSettings.mentions ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-400' : 'bg-zinc-900/50 border border-transparent text-zinc-500'}`}>
+                        <AtSign size={12} /> Mentions
                       </button>
                       <button onClick={() => toggleNotificationSetting('sound')}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all cursor-pointer ${notificationSettings.sound ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-400' : 'bg-zinc-900/50 border border-transparent text-zinc-500 hover:border-white/5'}`}>
-                        {notificationSettings.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}
-                        <span className="text-[10px] font-medium uppercase tracking-tight">Sound</span>
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${notificationSettings.sound ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-400' : 'bg-zinc-900/50 border border-transparent text-zinc-500'}`}>
+                        {notificationSettings.sound ? <Volume2 size={12} /> : <VolumeX size={12} />} Sound
                       </button>
                     </div>
                   )}
@@ -533,134 +532,95 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
 
               {/* Gamification Tab */}
               {activeTab === 'gamification' && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="space-y-4 animate-fade-in">
                   {/* XP & Level Summary */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-500/20">
-                    <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600">
-                      <span className="text-xl font-black text-white">{getLevel(userTotalXP)}</span>
+                  <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-lg border border-amber-500/20">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                      <span className="text-lg font-black text-white">{getLevel(userTotalXP)}</span>
                     </div>
                     <div className="flex-1">
                       <div className="text-sm font-bold text-white">{getLevelTitle(userTotalXP)}</div>
-                      <div className="flex items-center gap-2 text-xs text-amber-400">
-                        <Zap size={12} />
-                        <span>{userTotalXP} XP total</span>
+                      <div className="flex items-center gap-1 text-xs text-amber-400">
+                        <Zap size={10} />
+                        <span>{userTotalXP} XP</span>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-white">{completedChallenges.length}</div>
-                      <div className="text-[10px] text-zinc-500 uppercase">Completed</div>
+                      <div className="text-[10px] text-zinc-500">Done</div>
                     </div>
                   </div>
 
                   {/* Challenges */}
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Trophy size={14} className="text-amber-500" />
-                      <h3 className="text-sm font-semibold">Challenges</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trophy size={12} className="text-amber-500" />
+                      <h3 className="text-xs font-semibold">Challenges</h3>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {challenges.map((challenge) => {
                         const Icon = getChallengeIcon(challenge);
                         const progress = Math.min((challenge.progress / challenge.goal) * 100, 100);
                         return (
-                          <div key={challenge.id} className={`p-3 rounded-xl border transition-all ${challenge.completed ? 'bg-amber-500/10 border-amber-500/30' : 'bg-zinc-900/50 border-white/5'}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${challenge.completed ? 'bg-amber-500/20' : 'bg-zinc-800'}`}>
-                                <Icon size={16} className={challenge.completed ? 'text-amber-400' : 'text-zinc-400'} />
-                              </div>
+                          <div key={challenge.id} className={`p-2.5 rounded-lg border transition-all ${challenge.completed ? 'bg-amber-500/10 border-amber-500/30' : 'bg-zinc-900/50 border-white/5'}`}>
+                            <div className="flex items-center gap-2">
+                              <Icon size={14} className={challenge.completed ? 'text-amber-400' : 'text-zinc-500'} />
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-white truncate">{challenge.title}</span>
-                                  {challenge.completed && <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded uppercase font-bold">Done</span>}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-medium text-white truncate">{challenge.title}</span>
+                                  {challenge.completed && <span className="text-[9px] px-1 py-0.5 bg-amber-500/20 text-amber-400 rounded uppercase">Done</span>}
                                 </div>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
                                     <div className="h-full bg-indigo-500 transition-all" style={{ width: `${progress}%` }} />
                                   </div>
-                                  <span className="text-[10px] text-zinc-500 shrink-0">{challenge.progress}/{challenge.goal}</span>
+                                  <span className="text-[9px] text-zinc-500">{challenge.progress}/{challenge.goal}</span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1 text-amber-400 shrink-0">
-                                <Zap size={12} />
-                                <span className="text-xs font-bold">{challenge.xp_reward}</span>
+                              <div className="flex items-center gap-0.5 text-amber-400 text-[10px]">
+                                <Zap size={10} />
+                                <span>{challenge.xp_reward}</span>
                               </div>
                             </div>
                           </div>
                         );
                       })}
                       {challenges.length === 0 && (
-                        <div className="text-center py-8 text-zinc-500 text-sm">No challenges available</div>
+                        <div className="text-center py-6 text-zinc-500 text-xs">No challenges available</div>
                       )}
                     </div>
                   </div>
 
                   {/* Badges */}
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Star size={14} className="text-purple-500" />
-                      <h3 className="text-sm font-semibold">Badges</h3>
-                      <span className="text-xs text-zinc-500 ml-auto">{unlockedBadges.length}/{badges.length}</span>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Star size={12} className="text-purple-500" />
+                      <h3 className="text-xs font-semibold">Badges</h3>
+                      <span className="text-[10px] text-zinc-500 ml-auto">{unlockedBadges.length}/{badges.length}</span>
                     </div>
                     
                     {unlockedBadges.length > 0 && (
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Featured on Profile</p>
-                          <span className="text-[10px] text-indigo-400 ml-auto">{highlightedBadges.length}/3</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                          {unlockedBadges.map((badge: BadgeWithStatus) => {
-                            const isHighlighted = highlightedBadges.includes(badge.id);
-                            return (
-                              <button
-                                key={badge.id}
-                                onClick={() => {
-                                  if (isHighlighted) {
-                                    setHighlightedBadges(prev => prev.filter(id => id !== badge.id));
-                                  } else if (highlightedBadges.length < 3) {
-                                    setHighlightedBadges(prev => [...prev, badge.id]);
-                                  }
-                                }}
-                                className={`relative p-3 rounded-xl border-2 transition-all cursor-pointer hover:scale-[1.02] ${
-                                  isHighlighted 
-                                    ? 'border-indigo-500 shadow-lg shadow-indigo-500/20' 
-                                    : 'border-transparent hover:border-white/10'
-                                }`}
-                                style={{ backgroundColor: badge.color + '15' }}
-                              >
-                                <div className="flex flex-col items-center gap-2">
-                                  <div className="relative">
-                                    <span className={`text-3xl ${isHighlighted ? '' : 'grayscale opacity-50'}`}>{BADGE_ICONS[badge.icon] || '🏅'}</span>
-                                    {isHighlighted && (
-                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
-                                        <Star size={10} className="text-white fill-current" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] font-medium text-white/80 text-center truncate w-full">{badge.name}</span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <p className="text-[10px] text-zinc-600">Click badges to feature up to 3 on your profile</p>
-                      </div>
-                    )}
-
-                    {lockedBadges.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Locked</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {lockedBadges.slice(0, 6).map((badge: BadgeWithStatus) => (
-                            <div key={badge.id} className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800 opacity-50">
-                              <span className="text-2xl grayscale">{BADGE_ICONS[badge.icon] || '🏅'}</span>
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-zinc-400 truncate">{badge.name}</p>
-                                <p className="text-[10px] text-zinc-600 truncate">{badge.description}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {unlockedBadges.map((badge: BadgeWithStatus) => {
+                          const isHighlighted = highlightedBadges.includes(badge.id);
+                          return (
+                            <button
+                              key={badge.id}
+                              onClick={() => {
+                                if (isHighlighted) {
+                                  setHighlightedBadges(prev => prev.filter(id => id !== badge.id));
+                                } else if (highlightedBadges.length < 3) {
+                                  setHighlightedBadges(prev => [...prev, badge.id]);
+                                }
+                              }}
+                              className={`relative p-2 rounded-lg border transition-all cursor-pointer ${isHighlighted ? 'border-indigo-500' : 'border-transparent hover:border-white/10'}`}
+                              style={{ backgroundColor: badge.color + '15' }}
+                            >
+                              <span className={`text-xl block text-center ${isHighlighted ? '' : 'grayscale opacity-50'}`}>{BADGE_ICONS[badge.icon] || '🏅'}</span>
+                              <span className="text-[9px] text-white/80 block text-center truncate mt-1">{badge.name}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -669,62 +629,54 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
 
               {/* About Tab */}
               {activeTab === 'about' && (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="text-center py-8">
-                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-xl">
-                      <span className="text-3xl font-black text-white">B</span>
+                <div className="space-y-4 animate-fade-in">
+                  <div className="text-center py-4">
+                    <div className="w-16 h-16 mx-auto mb-3 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
+                      <span className="text-2xl font-black text-white">B</span>
                     </div>
-                    <h2 className="text-xl font-bold text-white mb-1">The Basement</h2>
-                    <p className="text-sm text-zinc-500">Version {appVersion}</p>
+                    <h2 className="text-lg font-bold text-white">The Basement</h2>
+                    <p className="text-xs text-zinc-500">v{appVersion}</p>
                   </div>
 
-                  <div className="bg-zinc-800/30 rounded-xl border border-white/5 p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <RefreshCw size={20} className="text-indigo-400" />
-                      <div>
-                        <h3 className="text-sm font-semibold text-white">Auto Updates</h3>
-                        <p className="text-[10px] text-zinc-500">Download and install the latest version</p>
-                      </div>
+                  <div className="bg-zinc-800/30 rounded-lg border border-white/5 p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw size={14} className="text-indigo-400" />
+                      <span className="text-xs font-semibold text-white">Auto Updates</span>
                     </div>
                     {updateInfo ? (
-                      <div className="space-y-3">
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                          <p className="text-sm text-emerald-400 font-medium">Update available: v{updateInfo.version}</p>
-                          {updateInfo.body && <p className="text-xs text-zinc-400 mt-1">{updateInfo.body}</p>}
+                      <div className="space-y-2">
+                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs text-emerald-400">
+                          Update: v{updateInfo.version}
                         </div>
                         {isDownloading ? (
                           <div>
-                            <div className="flex justify-between text-xs mb-1"><span className="text-zinc-400">Downloading...</span><span className="text-white">{downloadProgress}%</span></div>
-                            <div className="h-2 bg-zinc-700 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all" style={{ width: `${downloadProgress}%` }} /></div>
+                            <div className="flex justify-between text-[10px] mb-1"><span className="text-zinc-400">Downloading...</span><span className="text-white">{downloadProgress}%</span></div>
+                            <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all" style={{ width: `${downloadProgress}%` }} /></div>
                           </div>
                         ) : (
-                          <button onClick={downloadAndInstall} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 cursor-pointer">
-                            <Download size={16} /> Download & Install
+                          <button onClick={downloadAndInstall} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg cursor-pointer">
+                            <Download size={12} /> Download
                           </button>
                         )}
                       </div>
                     ) : (
                       <button onClick={checkForUpdates} disabled={isChecking}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all cursor-pointer">
-                        {isChecking ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Checking...</> : <><RefreshCw size={16} />Check for Updates</>}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white text-xs rounded-lg cursor-pointer">
+                        {isChecking ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw size={12} />} Check
                       </button>
                     )}
-                  </div>
-                  <div className="bg-zinc-800/30 rounded-xl border border-white/5 p-4">
-                    <h3 className="text-sm font-semibold text-white mb-2">About</h3>
-                    <p className="text-xs text-zinc-500 leading-relaxed">The Basement is a modern chat application built with Next.js and Tauri. Connect with friends and colleagues in real-time.</p>
                   </div>
                 </div>
               )}
             </div>
 
             {activeTab !== 'about' && (
-              <div className="p-4 border-t border-white/5 bg-black/20 shrink-0">
-                <div className="flex gap-3">
-                  <button onClick={handleSave} className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 p-3 rounded-xl font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 cursor-pointer">
-                    <Save size={16} /> Save Changes
+              <div className="px-4 py-3 border-t border-white/5 bg-black/20 shrink-0">
+                <div className="flex gap-2">
+                  <button onClick={handleSave} className="flex-1 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Save size={12} /> Save
                   </button>
-                  <button onClick={() => setShowSettings(false)} className="px-6 py-3 text-zinc-400 hover:text-white font-semibold text-sm uppercase tracking-wider transition-colors bg-zinc-800/50 border border-white/10 hover:border-white/20 rounded-xl cursor-pointer">
+                  <button onClick={() => setShowSettings(false)} className="px-4 py-2 text-zinc-400 hover:text-white bg-zinc-800/50 border border-white/10 hover:border-white/20 rounded-lg text-xs cursor-pointer">
                     Done
                   </button>
                 </div>

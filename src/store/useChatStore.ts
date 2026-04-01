@@ -45,6 +45,8 @@ interface ViewProfile {
   status?: string;
   avatar_effect?: string;
   avatar_overlays?: string;
+  font_style?: string;
+  text_color?: string;
 }
 
 interface UserProfile {
@@ -70,7 +72,10 @@ interface ChatStore {
   viewProfile: ViewProfile | null;
   reduceMotion: boolean;
   isTabVisible: boolean;
-  lastReadTimestamp: string;
+  
+  // Per-channel last read timestamps
+  lastReadTimestamps: Record<string, string>;
+  unreadCounts: Record<string, number>;
   
   reactions: Record<string, Reaction[]>;
   pinnedMessages: PinnedMessage[];
@@ -81,6 +86,8 @@ interface ChatStore {
   
   showUpdatePopup: boolean;
   dismissedUpdateVersion: string | null;
+  showKeyboardShortcuts: boolean;
+  setShowKeyboardShortcuts: (show: boolean) => void;
   
   // Message cache
   messageCache: Record<string, {
@@ -95,8 +102,9 @@ interface ChatStore {
   setViewProfile: (profile: ViewProfile | null) => void;
   setReduceMotion: (reduce: boolean) => void;
   setIsTabVisible: (visible: boolean) => void;
-  setLastReadTimestamp: (timestamp: string) => void;
-  updateLastReadToNow: () => void;
+  markChannelRead: (channelId: string) => void;
+  setUnreadCount: (channelId: string, count: number) => void;
+  incrementUnread: (channelId: string) => void;
   setMessageCache: (channelId: string, data: { messages: any[]; hasMore: boolean; oldestMessageId: string | null }) => void;
   addMessagesToCache: (channelId: string, messages: any[], prepend?: boolean) => void;
   updateMessageInCache: (channelId: string, messageId: string, updates: Partial<any>) => void;
@@ -133,7 +141,8 @@ export const useChatStore = create<ChatStore>()(
       viewProfile: null,
       reduceMotion: false,
       isTabVisible: true,
-      lastReadTimestamp: new Date().toISOString(),
+      lastReadTimestamps: {},
+      unreadCounts: {},
       
       reactions: {},
       pinnedMessages: [],
@@ -146,8 +155,9 @@ export const useChatStore = create<ChatStore>()(
         sound: true,
       },
 
-      showUpdatePopup: false,
-      dismissedUpdateVersion: null,
+  showUpdatePopup: false,
+  dismissedUpdateVersion: null,
+  showKeyboardShortcuts: false,
 
       // Message cache
       messageCache: {},
@@ -161,13 +171,19 @@ export const useChatStore = create<ChatStore>()(
 
       setChannels: (channels) => set({ channels }),
       
-      setActiveChannel: (channel) => set({ 
-        activeChannel: channel,
-        lastReadTimestamp: new Date().toISOString(),
-        replyTo: null,
-        searchQuery: '',
-        isSearching: false,
-        reactions: {},
+      setActiveChannel: (channel) => set((state) => { 
+        const newTimestamps = { ...state.lastReadTimestamps };
+        if (channel?.id) {
+          newTimestamps[channel.id] = new Date().toISOString();
+        }
+        return {
+          activeChannel: channel,
+          lastReadTimestamps: newTimestamps,
+          replyTo: null,
+          searchQuery: '',
+          isSearching: false,
+          reactions: {},
+        };
       }),
       
       setShowSettings: (show) => set({ showSettings: show }),
@@ -178,9 +194,18 @@ export const useChatStore = create<ChatStore>()(
       
       setIsTabVisible: (visible) => set({ isTabVisible: visible }),
       
-      setLastReadTimestamp: (timestamp) => set({ lastReadTimestamp: timestamp }),
+      markChannelRead: (channelId: string) => set((state) => ({
+        lastReadTimestamps: { ...state.lastReadTimestamps, [channelId]: new Date().toISOString() },
+        unreadCounts: { ...state.unreadCounts, [channelId]: 0 },
+      })),
       
-      updateLastReadToNow: () => set({ lastReadTimestamp: new Date().toISOString() }),
+      setUnreadCount: (channelId: string, count: number) => set((state) => ({
+        unreadCounts: { ...state.unreadCounts, [channelId]: count },
+      })),
+      
+      incrementUnread: (channelId: string) => set((state) => ({
+        unreadCounts: { ...state.unreadCounts, [channelId]: (state.unreadCounts[channelId] || 0) + 1 },
+      })),
       
       setReactions: (messageId, reactions) => set((state) => ({
         reactions: { ...state.reactions, [messageId]: reactions },
@@ -267,6 +292,8 @@ export const useChatStore = create<ChatStore>()(
         showUpdatePopup: false, 
         dismissedUpdateVersion: version 
       }),
+      
+      setShowKeyboardShortcuts: (show: boolean) => set({ showKeyboardShortcuts: show }),
       
       setMessageCache: (channelId, data) => set((state) => ({
         messageCache: {

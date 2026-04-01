@@ -54,6 +54,8 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
     if (c.created_by === myProfile?.id) return false;
     return true;
   });
+  
+  const unreadCounts = useChatStore((state) => state.unreadCounts);
 
   const canEditChannel = (channel: any) => {
     return channel.created_by === myProfile?.id || (isAdmin && channel.is_official);
@@ -90,60 +92,54 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
       <div
         key={chan.id}
         onClick={() => handleChannelClick(chan)}
-        className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-200 ${
+        className={`group flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] cursor-pointer transition-all ${
           isActive
-            ? "bg-gradient-to-r from-indigo-600/90 to-indigo-600/70 text-white shadow-lg shadow-indigo-500/20"
-            : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+            ? "bg-indigo-500/20 text-indigo-300 font-medium"
+            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
         }`}
       >
         {hasEmoji ? (
-          <span className="shrink-0 text-base">{emoji}</span>
+          <span className="shrink-0 text-sm">{emoji}</span>
         ) : (
-          <Hash size={14} className={`shrink-0 ${isActive ? "text-indigo-200" : "text-zinc-700 group-hover:text-zinc-500"}`} />
+          <Hash size={13} className={`shrink-0 ${isActive ? "text-indigo-400" : "text-zinc-700"}`} />
         )}
-        <span className="truncate font-medium">{chan.name}</span>
+        <span className="truncate">{chan.name}</span>
         {isOfficial && (
-          <Shield size={10} className={`shrink-0 ${isActive ? "text-indigo-300" : "text-indigo-500"}`} />
+          <Shield size={9} className={`shrink-0 ${isActive ? "text-indigo-400" : "text-indigo-500/60"}`} />
         )}
-        {creatorUsername && (
-          <span className={`text-[9px] truncate ${isActive ? "text-indigo-200/60" : "text-zinc-600"}`}>
-            by {creatorUsername}
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {canInvite && (
             <button
               onClick={(e) => handleInviteClick(e, chan)}
-              className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
-                isActive ? "text-indigo-200 hover:bg-indigo-500/30" : "text-zinc-600 hover:bg-white/10"
-              }`}
-              title="Invite members"
+              className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              title="Invite"
             >
-              <UserPlus size={12} />
+              <UserPlus size={11} />
             </button>
           )}
           <button
             onClick={(e) => handleViewMembersClick(e, chan)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
-              isActive ? "text-indigo-200 bg-indigo-500/20" : "text-zinc-500 bg-zinc-800/50"
-            }`}
-            title="View members"
+            className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] text-zinc-600 hover:text-zinc-400 hover:bg-white/10 transition-all cursor-pointer"
+            title="Members"
           >
-            <Users size={10} />
+            <Users size={9} />
             {memberCounts?.[chan.id] ?? 0}
           </button>
           {canEdit && (
             <button
               onClick={(e) => handleEditClick(e, chan)}
-              className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
-                isActive ? "text-indigo-200 hover:bg-indigo-500/30" : "text-zinc-600 hover:bg-white/10"
-              }`}
-              title="Edit channel"
+              className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              title="Edit"
             >
-              <Pencil size={12} />
+              <Pencil size={11} />
             </button>
           )}
         </div>
+        {!isActive && (unreadCounts[chan.id] || 0) > 0 && (
+          <span className="ml-auto px-1.5 py-0.5 text-[9px] font-bold bg-indigo-500 text-white rounded-full min-w-[16px] text-center">
+            {unreadCounts[chan.id] > 99 ? '99+' : unreadCounts[chan.id]}
+          </span>
+        )}
       </div>
     );
   };
@@ -176,63 +172,67 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
         {/* Official Channels */}
         {userChannels.length > 0 && (
-          <div className="p-2">
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1">
-                <Shield size={10} /> Official
-              </span>
+          <div className="px-3 pt-4">
+            <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+              <Shield size={9} /> Official
+            </span>
+            <div className="mt-1 space-y-0.5">
+              {userChannels.map((chan: any) => renderChannelItem(chan, true))}
             </div>
-            {userChannels.map((chan: any) => renderChannelItem(chan, true))}
           </div>
         )}
         
         {/* User's Channels */}
         {myChannels.length > 0 && (
-          <div className="p-2 border-t border-white/5">
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+          <div className="px-3 pt-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 My Channels
               </span>
               <span className="text-[9px] text-zinc-600">{myChannels.length}/3</span>
             </div>
-            {myChannels.map((chan: any) => renderChannelItem(chan, false, false, true))}
+            <div className="mt-1 space-y-0.5">
+              {myChannels.map((chan: any) => renderChannelItem(chan, false, false, true))}
+            </div>
           </div>
         )}
 
         {/* Joined Channels */}
         {joinedChannels.length > 0 && (
-          <div className="p-2 border-t border-white/5">
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+          <div className="px-3 pt-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 Joined
               </span>
               <span className="text-[9px] text-zinc-600">{joinedChannels.length}</span>
             </div>
-            {joinedChannels.map((chan: any) => renderChannelItem(chan, false, false, false))}
+            <div className="mt-1 space-y-0.5">
+              {joinedChannels.map((chan: any) => renderChannelItem(chan, false, false, false))}
+            </div>
           </div>
         )}
         
         {/* Create Channel Button */}
         {myChannels.length < 3 && (
-          <div className="p-2 border-t border-white/5">
+          <div className="px-3 pt-4">
             <button
               onClick={() => { onCreateChannel?.(); onClose?.(); }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-white hover:bg-white/5 transition-all duration-200"
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
             >
-              <Plus size={14} className="shrink-0" />
-              <span className="font-medium">Create Channel</span>
+              <Plus size={12} className="shrink-0" />
+              <span>Create Channel</span>
             </button>
           </div>
         )}
 
         {/* Discover Button */}
-        <div className="p-2 border-t border-white/5">
+        <div className="px-3 pt-2 pb-4">
           <button
             onClick={() => { onDiscover?.(); onClose?.(); }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-white hover:bg-white/5 transition-all duration-200"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
           >
-            <Globe size={14} className="shrink-0" />
-            <span className="font-medium">Discover Channels</span>
+            <Globe size={12} className="shrink-0" />
+            <span>Discover</span>
           </button>
         </div>
       </div>

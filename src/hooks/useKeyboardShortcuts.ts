@@ -1,60 +1,65 @@
-import { useEffect } from 'react';
-
-interface Shortcut {
-  key: string;
-  ctrl?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-  handler: () => void;
-  description?: string;
-}
-
-export function useKeyboardShortcuts(shortcuts: Shortcut[], enabled = true) {
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      for (const shortcut of shortcuts) {
-        const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase();
-        const ctrlMatch = shortcut.ctrl ? e.ctrlKey || e.metaKey : !e.ctrlKey && !e.metaKey;
-        const shiftMatch = shortcut.shift ? e.shiftKey : !e.shiftKey;
-        const altMatch = shortcut.alt ? e.altKey : !e.altKey;
-
-        if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
-          e.preventDefault();
-          shortcut.handler();
-          break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shortcuts, enabled]);
-}
+import { useEffect, useCallback, useRef } from 'react';
+import { useChatStore } from '@/store/useChatStore';
 
 export function useGlobalKeyboardShortcuts(handlers: {
   onEscape?: () => void;
   onEnter?: () => void;
   onSlash?: () => void;
   onCtrlK?: () => void;
+  onCtrlEnter?: () => void;
 }) {
+  const { setShowSettings, showSettings, setShowKeyboardShortcuts, showKeyboardShortcuts } = useChatStore();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Escape - Close modals
       if (e.key === 'Escape') {
+        if (showSettings) {
+          setShowSettings(false);
+          handlers.onEscape?.();
+          return;
+        }
+        if (showKeyboardShortcuts) {
+          setShowKeyboardShortcuts(false);
+          return;
+        }
         handlers.onEscape?.();
-      } else if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
-        handlers.onEnter?.();
-      } else if (e.key === '/' && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault();
-        handlers.onSlash?.();
-      } else if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+        return;
+      }
+
+      // Ctrl/Cmd + Enter - Send message (when in textarea)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (target.tagName === 'TEXTAREA') {
+          e.preventDefault();
+          handlers.onCtrlEnter?.();
+          return;
+        }
+      }
+
+      // Ctrl/Cmd + K - Search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         handlers.onCtrlK?.();
+        return;
+      }
+
+      // Ctrl/Cmd + / - Show shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        setShowKeyboardShortcuts(true);
+        return;
+      }
+
+      // / - Slash commands (when in input, not in message input)
+      if (e.key === '/' && !isInput) {
+        handlers.onSlash?.();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlers]);
+  }, [handlers, setShowSettings, showSettings, setShowKeyboardShortcuts, showKeyboardShortcuts]);
 }

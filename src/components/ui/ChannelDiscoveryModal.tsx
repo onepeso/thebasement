@@ -181,54 +181,52 @@ export function ChannelDiscoveryModal({
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative w-full max-w-2xl animate-scale-in max-h-[80vh] flex flex-col">
-        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-xl" />
-
+      <div className="relative w-full max-w-lg animate-scale-in max-h-[75vh] flex flex-col">
         <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-white/5 shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                  <Globe size={20} className="text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Discover Channels</h2>
-                  <p className="text-xs text-zinc-500">Find and join public channels</p>
-                </div>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                <Globe size={14} className="text-white" />
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-white/5 rounded-lg text-zinc-500 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Discover</h2>
+                <p className="text-[9px] text-zinc-500">Find channels</p>
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-white/5 rounded text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
 
+          <div className="px-4 py-3 border-b border-white/5">
             <div className="relative">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search channels..."
-                className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-white/10 rounded-xl text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-all"
+                className="w-full pl-8 pr-3 py-2 bg-zinc-900/50 border border-white/10 rounded-lg text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-all"
                 autoFocus
               />
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
             {loading && (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
               </div>
             )}
 
             {!loading && filteredChannels.length === 0 && (
-              <div className="text-center py-12">
-                <Hash size={32} className="mx-auto text-zinc-700 mb-3" />
-                <p className="text-sm text-zinc-500">
-                  {search ? 'No channels found' : 'No public channels available'}
+              <div className="text-center py-8">
+                <Hash size={24} className="mx-auto text-zinc-700 mb-2" />
+                <p className="text-xs text-zinc-500">
+                  {search ? 'No channels found' : 'No public channels'}
                 </p>
               </div>
             )}
@@ -241,60 +239,56 @@ export function ChannelDiscoveryModal({
               return (
                 <div
                   key={channel.id}
-                  className="flex items-start gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors mb-2 last:mb-0"
+                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors"
                 >
                   <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                     style={{
                       background: `linear-gradient(135deg, ${color.from}, ${color.to})`,
                     }}
                   >
                     {hasEmoji ? (
-                      <span className="text-xl">{emoji}</span>
+                      <span className="text-lg">{emoji}</span>
                     ) : (
-                      <Hash size={20} className="text-white/80" />
+                      <Hash size={16} className="text-white/80" />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-bold text-white truncate">#{channel.name}</h3>
-                      <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-                        <Users size={10} />
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-semibold text-white truncate">#{channel.name}</h3>
+                      <span className="flex items-center gap-0.5 text-[9px] text-zinc-500">
+                        <Users size={8} />
                         {channel.member_count}
                       </span>
                     </div>
                     {channel.description && (
-                      <p className="text-xs text-zinc-400 mb-2 line-clamp-2">
+                      <p className="text-[10px] text-zinc-400 line-clamp-1">
                         {channel.description}
                       </p>
                     )}
-                    <p className="text-[10px] text-zinc-600 flex items-center gap-1">
-                      <Crown size={10} className="text-amber-500" />
-                      Created by {getCreatorUsername(channel.created_by)}
-                    </p>
                   </div>
 
                   <div className="shrink-0">
                     {channel.has_pending_request ? (
                       <button
                         disabled
-                        className="px-4 py-2 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded-lg flex items-center gap-1"
+                        className="px-3 py-1.5 bg-amber-500/20 text-amber-400 text-[10px] font-medium rounded-lg flex items-center gap-1"
                       >
-                        <Send size={12} />
+                        <Send size={10} />
                         Pending
                       </button>
                     ) : (
                       <button
                         onClick={() => handleRequestInvite(channel)}
                         disabled={requesting === channel.id}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
                       >
                         {requesting === channel.id ? (
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
                           <>
-                            <Send size={12} />
+                            <Send size={10} />
                             Request
                           </>
                         )}

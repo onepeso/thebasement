@@ -6,6 +6,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { AvatarWithEffect } from './AvatarWithEffect';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserStatus, BadgeWithStatus } from '@/types/database';
+import { getUsernameStyle, getTextColor } from '@/utils/fontStyles';
 
 const BADGE_ICONS: Record<string, string> = {
   'message': '💬', 'message-circle': '💬', 'message-square': '💬',
@@ -169,136 +170,127 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in"
       onClick={(e) => e.target === e.currentTarget && setViewProfile(null)}
     >
-      <div className="relative w-full max-w-md animate-scale-in">
-        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-indigo-500/20 rounded-2xl blur-xl" />
-        
-        <div className="relative bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-sm animate-scale-in">
+        <div className="relative bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] overflow-y-auto">
           <div 
-            className="h-32 sm:h-40 relative bg-cover bg-center shrink-0"
-            style={{ backgroundImage: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)' }}
+            className="h-20 relative bg-cover bg-center shrink-0"
+            style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)' }}
           >
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/80 to-transparent" />
             
-            {/* XP Badge */}
-            <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-amber-500/30">
-              <Zap size={14} className="text-amber-500" />
-              <span className="text-xs font-bold text-amber-400">{userTotalXP} XP</span>
+            <div className="absolute top-2 left-3 flex items-center gap-1.5 px-2 py-1 bg-black/40 backdrop-blur-sm rounded-full">
+              <Zap size={10} className="text-amber-500" />
+              <span className="text-[10px] font-bold text-amber-400">{userTotalXP} XP</span>
             </div>
             
             <button
               onClick={() => setViewProfile(null)}
-              className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 rounded-lg text-white/80 hover:text-white transition-all"
+              className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-lg text-white/80 hover:text-white transition-all"
             >
-              <X size={18} />
+              <X size={14} />
             </button>
 
-            <div className="absolute -bottom-10 left-4">
+            <div className="absolute -bottom-8 left-4">
               <AvatarWithEffect 
                 profile={profileData} 
-                size="xl"
+                size="lg"
                 showStatus={true}
                 isOnline={isOnline}
               />
             </div>
           </div>
 
-          <div className="pt-14 sm:pt-16 px-4 sm:px-6 pb-6">
-            {/* Level & Title */}
-            <div className="mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600">
-                  <span className="text-lg font-black text-white">{level}</span>
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">
-                    {profileData.username || viewProfile.username}
-                  </h2>
-                  <p className="text-sm text-amber-400">{title}</p>
-                </div>
+          <div className="pt-10 px-4 pb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                <span className="text-sm font-black text-white">{level}</span>
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white" style={{
+                  ...getUsernameStyle(profileData.font_style || viewProfile.font_style),
+                  color: getTextColor(profileData.text_color || viewProfile.text_color),
+                }}>
+                  {profileData.username || viewProfile.username}
+                </h2>
+                <p className="text-[10px] text-amber-400">{title}</p>
               </div>
             </div>
 
-            {/* Stats Row */}
-            <div className="flex gap-4 mb-4">
-              <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg border border-white/5">
-                <Trophy size={14} className="text-amber-500" />
-                <span className="text-sm text-zinc-300">{userChallenges.length} achievements</span>
+            <div className="flex gap-3 mb-3">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-zinc-800/50 rounded-lg border border-white/5">
+                <Trophy size={12} className="text-amber-500" />
+                <span className="text-xs text-zinc-300">{userChallenges.length}</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg border border-white/5">
-                <Star size={14} className="text-amber-500" />
-                <span className="text-sm text-zinc-300">{earnedXP} XP earned</span>
+              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-zinc-800/50 rounded-lg border border-white/5">
+                <Star size={12} className="text-amber-500" />
+                <span className="text-xs text-zinc-300">{earnedXP}</span>
               </div>
               {userBadges.length > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg border border-white/5">
-                  <Award size={14} className="text-purple-500" />
-                  <span className="text-sm text-zinc-300">{userBadges.length}</span>
+                <div className="flex items-center gap-1.5 px-2 py-1.5 bg-zinc-800/50 rounded-lg border border-white/5">
+                  <Award size={12} className="text-purple-500" />
+                  <span className="text-xs text-zinc-300">{userBadges.length}</span>
                 </div>
               )}
             </div>
 
-            {/* Highlighted Badges */}
             {highlightedBadges.length > 0 && (
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles size={14} className="text-indigo-400" />
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Featured</span>
+              <div className="mb-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles size={10} className="text-indigo-400" />
+                  <span className="text-[9px] font-bold text-indigo-400 uppercase">Featured</span>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                  {highlightedBadges.map((badge: BadgeWithStatus, index: number) => (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {highlightedBadges.map((badge: BadgeWithStatus) => (
                     <div
                       key={badge.id}
-                      className="shrink-0 flex flex-col items-center gap-2 animate-fade-in"
-                      style={{ animationDelay: `${index * 100}ms` }}
+                      className="shrink-0 flex flex-col items-center gap-1"
                     >
                       <div 
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center border-2"
+                        className="w-10 h-10 rounded-lg flex items-center justify-center border"
                         style={{ 
                           backgroundColor: badge.color + '20',
                           borderColor: badge.color + '60',
                         }}
                       >
-                        <span className="text-3xl">{BADGE_ICONS[badge.icon] || '🏅'}</span>
+                        <span className="text-lg">{BADGE_ICONS[badge.icon] || '🏅'}</span>
                       </div>
-                      <span className="text-[10px] font-medium text-zinc-400 text-center max-w-16 truncate">{badge.name}</span>
+                      <span className="text-[9px] text-zinc-400 text-center max-w-12 truncate">{badge.name}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Status */}
-            <div className="flex items-center gap-2 mb-4">
-              <Circle size={10} className={`${statusConfig.dot} fill-current`} />
-              <span className="text-xs text-zinc-400">{statusConfig.label}</span>
+            <div className="flex items-center gap-1.5 mb-3">
+              <Circle size={8} className={`${statusConfig.dot} fill-current`} />
+              <span className="text-[10px] text-zinc-400">{statusConfig.label}</span>
             </div>
 
-            {/* Bio */}
             {(profileData.bio || viewProfile.bio) && (
-              <div className="bg-zinc-800/30 rounded-lg px-4 py-3 mb-4">
-                <p className="text-sm text-zinc-300">
+              <div className="bg-zinc-800/30 rounded-lg px-3 py-2 mb-3">
+                <p className="text-xs text-zinc-300">
                   {profileData.bio || viewProfile.bio}
                 </p>
               </div>
             )}
 
-            {/* Achievements */}
             {userChallenges.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">
+                <h3 className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
                   Achievements
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {userChallenges.map((uc) => {
                     if (!uc.challenge) return null;
                     const Icon = getChallengeIcon(uc.challenge);
                     return (
                       <div
                         key={uc.challenge_id}
-                        className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full"
+                        className="flex items-center gap-1 px-1.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full"
                         title={`${uc.challenge.title} - ${uc.challenge.description}`}
                       >
-                        <Icon size={14} className="text-amber-400" />
-                        <span className="text-[10px] font-medium text-amber-400">{uc.challenge.xp_reward} XP</span>
+                        <Icon size={10} className="text-amber-400" />
+                        <span className="text-[9px] font-medium text-amber-400">{uc.challenge.xp_reward}</span>
                       </div>
                     );
                   })}
@@ -307,8 +299,8 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
             )}
 
             {loadingChallenges && (
-              <div className="flex items-center justify-center py-4">
-                <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-3">
+                <div className="w-4 h-4 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@ import { useChatStore } from '@/store/useChatStore';
 
 const MESSAGE_LIMIT = 50;
 
-export function useChat(channelId: string | undefined, userId: string | undefined) {
+export function useChat(channelId: string | undefined, userId: string | undefined, onNewMessage?: (msg: any) => void) {
     const [messages, setMessages] = useState<any[]>([]);
     const [hasMore, setHasMore] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -13,6 +13,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
     
     const messageCache = useChatStore((state) => state.messageCache);
     const setMessageCache = useChatStore((state) => state.setMessageCache);
+    const lastReadTimestamps = useChatStore((state) => state.lastReadTimestamps);
     
     const fetchingRef = useRef(false);
     const channelIdRef = useRef(channelId);
@@ -41,7 +42,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
 
             const { data: msgData, error: msgError } = await supabase
                 .from('messages')
-                .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                 .eq('channel_id', channelId)
                 .order('created_at', { ascending: true })
                 .limit(MESSAGE_LIMIT);
@@ -67,7 +68,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 if (replyMsgIds.length > 0) {
                     const replyMessagesResult = await supabase
                         .from('messages')
-                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                         .in('id', replyMsgIds);
                     
                     if (replyMessagesResult.data && channelId === channelIdRef.current) {
@@ -174,6 +175,12 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                         if (prev.some(m => m.id === newMsg.id)) return prev;
                         return [...prev, newMsg];
                     });
+                    
+                    // Call onNewMessage callback and update unread counts
+                    const lastRead = lastReadTimestamps[channelIdRef.current || ''] || '1970-01-01';
+                    if (newMsg.user_id !== userId && new Date(newMsg.created_at) > new Date(lastRead)) {
+                        onNewMessage?.(newMsg);
+                    }
                 } catch (err) {
                     console.error('Error handling message insert:', err);
                 }
@@ -219,7 +226,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
 
             const { data: msgData } = await supabase
                 .from('messages')
-                .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                 .eq('channel_id', channelId)
                 .lt('created_at', oldestMsg.created_at)
                 .order('created_at', { ascending: true })
@@ -234,7 +241,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 if (replyMsgIds.length > 0) {
                     const replyMessagesResult = await supabase
                         .from('messages')
-                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                        .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                         .in('id', replyMsgIds);
                     
                     if (replyMessagesResult.data) {

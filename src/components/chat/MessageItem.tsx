@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { Pencil, Trash2, Smile, Pin, PinOff, Reply } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
+import { getUsernameStyle, getTextColor } from "@/utils/fontStyles";
 
 function MessageItemInner({
   msg,
@@ -20,6 +21,7 @@ function MessageItemInner({
   onReply,
   searchQuery,
   myUsername,
+  allProfiles = [],
 }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -94,13 +96,58 @@ function MessageItemInner({
   };
 
   const highlightText = (text: string, query: string) => {
-    if (!query) return text;
+    if (!query) return renderMentions(text);
     const parts = text.split(new RegExp(`(${query})`, 'gi'));
     return parts.map((part, i) =>
       part.toLowerCase() === query.toLowerCase() ? (
-        <mark key={i} className="bg-yellow-500/30 text-yellow-300 rounded px-0.5">{part}</mark>
-      ) : part
+        <mark key={i} className="bg-yellow-500/30 text-yellow-300 rounded px-0.5">{renderMentions(part)}</mark>
+      ) : renderMentions(part)
     );
+  };
+
+  const renderMentions = (text: string) => {
+    const mentionRegex = /@(\w+)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      
+      const username = match[1];
+      const mentionedProfile = allProfiles.find((p: any) => p.username?.toLowerCase() === username.toLowerCase());
+      
+      if (mentionedProfile) {
+        parts.push(
+          <button
+            key={match.index}
+            onClick={(e) => {
+              e.stopPropagation();
+              useChatStore.getState().setViewProfile(mentionedProfile);
+            }}
+            className="text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer"
+            style={{
+              ...getUsernameStyle(mentionedProfile.font_style),
+              color: getTextColor(mentionedProfile.text_color),
+            }}
+          >
+            @{username}
+          </button>
+        );
+      } else {
+        parts.push(`@${username}`);
+      }
+      
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
   };
 
   return (
@@ -138,18 +185,22 @@ function MessageItemInner({
           )}
         </div>
 
-        <div className="flex flex-col min-w-0 flex-1">
-          {!isGrouped && (
-            <div className="flex items-center gap-2 mb-1 group/name">
-              <span
-                className={`font-semibold tracking-tight cursor-pointer hover:underline ${isMe ? "text-emerald-400 text-[13px]" : "text-indigo-400 text-[13px]"}`}
-                title={formatFullDate(msg.created_at)}
-                onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
-              >
-                {msg.profiles?.username}
-              </span>
-            </div>
-          )}
+            <div className="flex flex-col min-w-0 flex-1">
+              {!isGrouped && (
+                <div className="flex items-center gap-2 mb-1 group/name">
+                  <span
+                    className="font-semibold tracking-tight cursor-pointer hover:underline text-[13px]"
+                    style={{
+                      ...getUsernameStyle(msg.profiles?.font_style),
+                      color: getTextColor(msg.profiles?.text_color),
+                    }}
+                    title={formatFullDate(msg.created_at)}
+                    onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
+                  >
+                    {msg.profiles?.username}
+                  </span>
+                </div>
+              )}
 
           <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
@@ -220,47 +271,47 @@ function MessageItemInner({
             </div>
 
             {!isEditing && (
-              <div className="relative flex flex-row items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:opacity-0 transition-opacity duration-200 shrink-0">
+              <div className="relative flex items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:opacity-0 transition-opacity duration-200 shrink-0">
                 <button
                   onClick={() => onReactionClick && onReactionClick(msg)}
-                  className="p-1.5 rounded-lg text-zinc-600 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all cursor-pointer"
-                  title="Add reaction"
+                  className="p-1 rounded text-zinc-500 hover:text-yellow-400 hover:bg-white/5 transition-all cursor-pointer"
+                  title="React"
                 >
-                  <Smile size={14} />
+                  <Smile size={12} />
                 </button>
                 <button
                   onClick={() => onReply(msg)}
-                  className="p-1.5 rounded-lg text-zinc-600 hover:text-indigo-400 hover:bg-indigo-400/10 transition-all cursor-pointer"
+                  className="p-1 rounded text-zinc-500 hover:text-indigo-400 hover:bg-white/5 transition-all cursor-pointer"
                   title="Reply"
                 >
-                  <Reply size={14} />
+                  <Reply size={12} />
                 </button>
                 <button
                   onClick={() => isPinned ? onUnpin(msg.id) : onPin(msg.id)}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`p-1 rounded transition-all cursor-pointer ${
                     isPinned 
-                      ? 'text-indigo-400 bg-indigo-400/10' 
-                      : 'text-zinc-600 hover:text-indigo-400 hover:bg-indigo-400/10'
+                      ? 'text-indigo-400' 
+                      : 'text-zinc-500 hover:text-indigo-400'
                   }`}
                   title={isPinned ? "Unpin" : "Pin"}
                 >
-                  {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                  {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
                 </button>
                 {isMe && (
                   <>
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="p-1.5 rounded-lg text-zinc-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer"
+                      className="p-1 rounded text-zinc-500 hover:text-emerald-400 hover:bg-white/5 transition-all cursor-pointer"
                       title="Edit"
                     >
-                      <Pencil size={14} />
+                      <Pencil size={12} />
                     </button>
                     <button
                       onClick={() => onDelete(msg.id)}
-                      className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+                      className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-white/5 transition-all cursor-pointer"
                       title="Delete"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={12} />
                     </button>
                   </>
                 )}

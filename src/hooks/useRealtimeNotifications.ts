@@ -61,17 +61,21 @@ export function useRealtimeNotifications(userId: string | undefined) {
         .single();
       
       if (!existingSettings) {
-        // Create default settings
-        await supabase.from('notification_settings').insert({
+        // Create default settings (ignore conflict errors)
+        const { error } = await supabase.from('notification_settings').insert({
           user_id: userId,
           mentions: true,
           invites: true,
           sound: true,
         });
-        return;
+        // Ignore 409 Conflict - record was created by another process
+        if (error && error.code !== '23505') {
+          console.error('Error creating notification settings:', error);
+          return;
+        }
       }
       
-      if (!existingSettings.mentions) return;
+      if (!existingSettings?.mentions) return;
 
       const channel = supabase
         .channel(`user-notifications:${userId}`)

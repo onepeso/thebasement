@@ -257,24 +257,49 @@ export function useKeyboardShortcuts(callbacks: {
   onCloseModals: () => void;
   onFocusSearch: () => void;
   onSendMessage: () => void;
+  onOpenShortcuts: () => void;
 }) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
 
+      // Ctrl/Cmd + K - Command palette / Search
       if (modKey && e.key === "k") {
         e.preventDefault();
         callbacks.onOpenCommandPalette();
+        return;
       }
 
+      // Ctrl/Cmd + / - Show keyboard shortcuts
+      if (modKey && e.key === "/") {
+        e.preventDefault();
+        callbacks.onOpenShortcuts();
+        return;
+      }
+
+      // Escape - Close modals
       if (e.key === "Escape") {
         callbacks.onCloseModals();
+        return;
       }
 
+      // Ctrl/Cmd + F - Focus search
       if (modKey && e.key === "f") {
         e.preventDefault();
         callbacks.onFocusSearch();
+        return;
+      }
+
+      // Ctrl/Cmd + Enter - Send message (when in textarea)
+      if (modKey && e.key === "Enter") {
+        if (target.tagName === 'TEXTAREA') {
+          e.preventDefault();
+          callbacks.onSendMessage();
+          return;
+        }
       }
     };
 

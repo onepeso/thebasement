@@ -10,7 +10,7 @@ interface MemberListProps {
 }
 
 export function MemberList({ allProfiles, onlineUsers }: MemberListProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   
   const onlineCount = onlineUsers.length;
   const offlineCount = allProfiles.length - onlineCount;
@@ -39,7 +39,7 @@ export function MemberList({ allProfiles, onlineUsers }: MemberListProps) {
       </button>
       
       {isExpanded && (
-        <div className="px-3 pb-3 max-h-64 overflow-y-auto custom-scrollbar">
+        <div className="px-3 pb-3 overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 400px)' }}>
           {onlineCount > 0 && (
             <div className="mb-3">
               <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mb-2 px-1">

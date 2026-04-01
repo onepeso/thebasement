@@ -126,6 +126,12 @@ export function useInvites(userId?: string) {
       .eq('id', userId)
       .single();
 
+    await supabase
+      .from('channel_invites')
+      .delete()
+      .eq('channel_id', channelId)
+      .eq('invited_user_id', invitedUserId);
+
     const { data, error } = await supabase
       .from("channel_invites")
       .insert({
@@ -142,9 +148,6 @@ export function useInvites(userId?: string) {
       .single();
 
     if (error) {
-      if (error.code === "23505") {
-        return { error: "User has already been invited to this channel" };
-      }
       return { error: error.message };
     }
 
@@ -155,6 +158,7 @@ export function useInvites(userId?: string) {
         title: `${inviterData?.username || 'Someone'} invited you`,
         body: `Join #${channelData?.name || 'a channel'}`,
         channel_id: channelId,
+        inviter_id: userId,
       });
 
       setSentInvites((prev) => {

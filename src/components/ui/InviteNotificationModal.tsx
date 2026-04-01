@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, UserPlus, Check, XCircle, Hash, Mail } from "lucide-react";
+import { X, UserPlus, Check, XCircle, Hash } from "lucide-react";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
-import type { ChannelInvite } from "@/types/database";
+import { supabase } from "@/lib/supabase";
 
 const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
   indigo: { from: "#4f46e5", to: "#7c3aed" },
@@ -18,40 +18,123 @@ const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
   slate: { from: "#334155", to: "#64748b" },
 };
 
+interface InviteNotification {
+  id: string;
+  channel_id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  inviter_id?: string;
+  inviter?: {
+    id: string;
+    username: string;
+    avatar_url?: string;
+    avatar_effect?: string;
+  };
+  channel?: {
+    id: string;
+    name: string;
+    description?: string;
+    color?: string;
+    emoji?: string;
+  };
+}
+
 interface InviteNotificationModalProps {
-  invites: ChannelInvite[];
+  notifications: InviteNotification[];
   onlineUsers: string[];
-  onAccept: (invite: ChannelInvite) => Promise<{ success?: boolean; error?: string }>;
-  onDecline: (invite: ChannelInvite) => Promise<{ success?: boolean; error?: string }>;
+  currentUserId?: string;
   onClose: () => void;
+  onProcessed?: (notificationId: string) => void;
 }
 
 export function InviteNotificationModal({
-  invites,
+  notifications,
   onlineUsers,
-  onAccept,
-  onDecline,
+  currentUserId,
   onClose,
+  onProcessed,
 }: InviteNotificationModalProps) {
   const [processing, setProcessing] = useState<string | null>(null);
   const [processed, setProcessed] = useState<Record<string, "accepted" | "declined">>({});
 
-  const handleAccept = async (invite: ChannelInvite) => {
-    setProcessing(invite.id);
-    await onAccept(invite);
-    setProcessing(null);
-    setProcessed((prev) => ({ ...prev, [invite.id]: "accepted" }));
+  const handleAccept = async (notification: InviteNotification) => {
+    setProcessing(notification.id);
+    
+    try {
+      const { data: inviteData } = await supabase
+        .from('channel_invites')
+        .select('*')
+        .eq('channel_id', notification.channel_id)
+        .eq('invited_user_id', currentUserId)
+        .eq('status', 'pending')
+        .single();
+      
+      if (inviteData) {
+        await supabase
+          .from('channel_invites')
+          .update({ status: 'accepted' })
+          .eq('id', inviteData.id);
+        
+        await supabase.from('channel_members').insert({
+          channel_id: notification.channel_id,
+          user_id: currentUserId,
+          role: 'member',
+        });
+        
+        await supabase.from('messages').insert({
+          channel_id: notification.channel_id,
+          user_id: currentUserId,
+          text: 'joined the channel',
+          is_system: true,
+        });
+      }
+      
+      await supabase.from('user_notifications').delete().eq('id', notification.id);
+      setProcessed((prev) => ({ ...prev, [notification.id]: 'accepted' }));
+      onProcessed?.(notification.id);
+    } catch (error) {
+      console.error('Failed to accept invite:', error);
+    } finally {
+      setProcessing(null);
+    }
   };
 
-  const handleDecline = async (invite: ChannelInvite) => {
-    setProcessing(invite.id);
-    await onDecline(invite);
-    setProcessing(null);
-    setProcessed((prev) => ({ ...prev, [invite.id]: "declined" }));
+  const handleDecline = async (notification: InviteNotification) => {
+    setProcessing(notification.id);
+    
+    try {
+      const { data: inviteData } = await supabase
+        .from('channel_invites')
+        .select('*')
+        .eq('channel_id', notification.channel_id)
+        .eq('invited_user_id', currentUserId)
+        .eq('status', 'pending')
+        .single();
+      
+      if (inviteData) {
+        await supabase
+          .from('channel_invites')
+          .update({ status: 'declined' })
+          .eq('id', inviteData.id);
+      }
+      
+      await supabase.from('user_notifications').delete().eq('id', notification.id);
+      setProcessed((prev) => ({ ...prev, [notification.id]: 'declined' }));
+      onProcessed?.(notification.id);
+    } catch (error) {
+      console.error('Failed to decline invite:', error);
+    } finally {
+      setProcessing(null);
+    }
   };
 
-  const visibleInvites = invites.filter((i) => !processed[i.id]);
-  const hasInvites = visibleInvites.length > 0;
+  const inviteNotifications = notifications.filter(
+    (n) => n.type === 'invite' && !processed[n.id]
+  );
+  const hasInvites = inviteNotifications.length > 0;
 
   useEffect(() => {
     if (!hasInvites) {
@@ -62,12 +145,12 @@ export function InviteNotificationModal({
 
   if (!hasInvites) return null;
 
-  const invite = visibleInvites[0];
-  const isProcessing = processing === invite.id;
+  const notification = inviteNotifications[0];
+  const isProcessing = processing === notification.id;
 
-  const channelColor = invite.channel?.color || "indigo";
+  const channelColor = notification.channel?.color || "indigo";
   const color = GRADIENT_COLORS[channelColor] || GRADIENT_COLORS.indigo;
-  const emoji = invite.channel?.emoji;
+  const emoji = notification.channel?.emoji;
   const hasEmoji = emoji && emoji !== "💬";
 
   return (
@@ -91,50 +174,56 @@ export function InviteNotificationModal({
               Channel Invitation
             </h2>
             <p className="text-sm text-zinc-400">
-              You&apos;ve been invited to join
+              You've been invited to join
             </p>
           </div>
 
           <div className="p-6 space-y-4">
-            <div className="flex items-center gap-3 p-4 bg-zinc-900/50 rounded-xl border border-white/5">
-              <AvatarWithEffect
-                profile={invite.inviter}
-                size="md"
-                showStatus={true}
-                isOnline={onlineUsers.includes(invite.inviter_id)}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-white truncate">
-                  {invite.inviter?.username || "Unknown User"}
-                </p>
-                <p className="text-xs text-zinc-500">wants you to join</p>
+            {notification.inviter && (
+              <div className="flex items-center gap-3 p-4 bg-zinc-900/50 rounded-xl border border-white/5">
+                <AvatarWithEffect
+                  profile={{
+                    ...notification.inviter,
+                    avatar_url: notification.inviter?.avatar_url || '',
+                    avatar_effect: notification.inviter?.avatar_effect,
+                  }}
+                  size="md"
+                  showStatus={true}
+                  isOnline={onlineUsers.includes(notification.inviter_id || '')}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">
+                    {notification.inviter.username || "Unknown User"}
+                  </p>
+                  <p className="text-xs text-zinc-500">wants you to join</p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="text-center py-3 px-4 bg-zinc-900/30 rounded-xl border border-white/5">
               <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
                 Channel
               </p>
               <p className="text-base font-bold text-white">
-                # {invite.channel?.name || "Unknown Channel"}
+                # {notification.channel?.name || notification.message || "Unknown Channel"}
               </p>
-              {invite.channel?.description && (
+              {notification.channel?.description && (
                 <p className="text-xs text-zinc-500 mt-1 truncate">
-                  {invite.channel.description}
+                  {notification.channel.description}
                 </p>
               )}
             </div>
 
-            {visibleInvites.length > 1 && (
+            {inviteNotifications.length > 1 && (
               <p className="text-center text-xs text-zinc-500">
-                +{visibleInvites.length - 1} more invitation{visibleInvites.length > 2 ? "s" : ""}
+                +{inviteNotifications.length - 1} more invitation{inviteNotifications.length > 2 ? "s" : ""}
               </p>
             )}
           </div>
 
           <div className="p-4 flex gap-3 bg-black/20">
             <button
-              onClick={() => handleDecline(invite)}
+              onClick={() => handleDecline(notification)}
               disabled={isProcessing}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800/50 hover:bg-zinc-800 border border-white/10 text-zinc-400 hover:text-white font-semibold text-sm transition-all rounded-xl disabled:opacity-50"
             >
@@ -142,9 +231,9 @@ export function InviteNotificationModal({
               Decline
             </button>
             <button
-              onClick={() => handleAccept(invite)}
+              onClick={() => handleAccept(notification)}
               disabled={isProcessing}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-sm transition-all rounded-xl shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-sm transition-all rounded-xl shadow-lg shadow-indigo-500/20 disabled:opacity-50"
             >
               {isProcessing ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

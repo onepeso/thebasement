@@ -72,55 +72,48 @@ export function ChallengesModal({ open, onClose, challenges, totalXP }: Challeng
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative w-full max-w-lg animate-scale-in">
-        <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 rounded-2xl blur-xl" />
-        
+      <div className="relative w-full max-w-sm animate-scale-in">
         <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="p-4 border-b border-white/5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                  <Trophy size={20} className="text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Challenges</h2>
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <Star size={12} className="text-amber-500" />
-                    <span>{totalXP} XP earned</span>
-                  </div>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                <Trophy size={14} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Challenges</h2>
+                <div className="flex items-center gap-1 text-[9px] text-zinc-500">
+                  <Star size={8} className="text-amber-500" />
+                  <span>{totalXP} XP</span>
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-white/5 rounded-lg text-zinc-500 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
             </div>
-
-            {/* Filter tabs */}
-            <div className="flex gap-2 mt-4">
-              {(['all', 'active', 'completed'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setFilter(tab)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    filter === tab
-                      ? 'bg-amber-500/20 text-amber-400'
-                      : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                  }`}
-                >
-                  {tab === 'all' ? 'All' : tab === 'active' ? `Active (${activeCount})` : `Done (${completedCount})`}
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-white/5 rounded text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={14} />
+            </button>
           </div>
 
-          {/* Challenges list */}
-          <div className="max-h-[60vh] overflow-y-auto p-4 space-y-3">
+          <div className="flex gap-1 px-4 py-2 border-b border-white/5">
+            {(['all', 'active', 'completed'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-2.5 py-1 text-[10px] font-medium rounded transition-colors ${
+                  filter === tab
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {tab === 'all' ? 'All' : tab === 'active' ? `Active (${activeCount})` : `Done (${completedCount})`}
+              </button>
+            ))}
+          </div>
+
+          <div className="max-h-[50vh] overflow-y-auto p-2 space-y-2">
             {filteredChallenges.length === 0 ? (
-              <div className="text-center py-8 text-zinc-500">
+              <div className="text-center py-6 text-zinc-500 text-xs">
                 {filter === 'completed' ? 'No completed challenges yet' : 'No active challenges'}
               </div>
             ) : (
@@ -130,62 +123,49 @@ export function ChallengesModal({ open, onClose, challenges, totalXP }: Challeng
                 return (
                   <div
                     key={challenge.id}
-                    className={`relative p-4 rounded-xl border transition-all ${
+                    className={`relative p-2.5 rounded-lg border transition-all ${
                       challenge.completed
                         ? 'bg-emerald-500/5 border-emerald-500/20'
-                        : 'bg-zinc-900/50 border-white/5 hover:border-white/10'
+                        : 'bg-zinc-900/50 border-white/5'
                     }`}
                   >
-                    {/* Progress bar background */}
-                    {!challenge.completed && (
-                      <div className="absolute inset-0 rounded-xl bg-zinc-800/50 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 transition-all duration-500"
-                          style={{ width: `${Math.min((challenge.progress / challenge.goal) * 100, 100)}%` }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="relative flex items-start gap-3">
-                      {/* Icon */}
+                    <div className="flex items-start gap-2">
                       <div className={`shrink-0 ${challenge.completed ? 'text-emerald-500' : 'text-orange-500'} ${challenge.completed ? '' : 'opacity-50'}`}>
-                        <Icon size={24} />
+                        <Icon size={16} />
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className={`font-semibold text-sm ${
+                        <div className="flex items-center gap-1">
+                          <h3 className={`text-xs font-medium ${
                             challenge.completed ? 'text-emerald-400' : 'text-zinc-200'
                           }`}>
                             {challenge.title}
                           </h3>
                           {challenge.completed && (
-                            <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                            <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />
                           )}
                         </div>
-                        <p className="text-xs text-zinc-500 mt-0.5">{challenge.description}</p>
+                        <p className="text-[9px] text-zinc-500 mt-0.5">{challenge.description}</p>
                         
-                        {/* Progress / XP */}
-                        <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-2 mt-1.5">
                           {challenge.completed ? (
-                            <div className="flex items-center gap-1 text-xs text-amber-500">
-                              <Zap size={12} />
-                              <span>+{challenge.xp_reward} XP</span>
+                            <div className="flex items-center gap-0.5 text-[10px] text-amber-500">
+                              <Zap size={10} />
+                              <span>+{challenge.xp_reward}</span>
                             </div>
                           ) : (
                             <>
-                              <div className="flex items-center gap-1 text-xs text-zinc-500">
-                                <Circle size={12} className={
+                              <div className="flex items-center gap-0.5 text-[9px] text-zinc-500">
+                                <Circle size={10} className={
                                   challenge.progress >= challenge.goal
                                     ? 'fill-emerald-500 text-emerald-500'
                                     : 'text-zinc-600'
                                 } />
                                 <span>{challenge.progress}/{challenge.goal}</span>
                               </div>
-                              <div className="flex items-center gap-1 text-xs text-amber-500/70">
-                                <Zap size={10} />
-                                <span>{challenge.xp_reward} XP</span>
+                              <div className="flex items-center gap-0.5 text-[9px] text-amber-500/70">
+                                <Zap size={8} />
+                                <span>{challenge.xp_reward}</span>
                               </div>
                             </>
                           )}
@@ -198,15 +178,14 @@ export function ChallengesModal({ open, onClose, challenges, totalXP }: Challeng
             )}
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-white/5 bg-black/20">
-            <div className="flex items-center justify-between text-xs">
+          <div className="px-4 py-2 border-t border-white/5 bg-black/20">
+            <div className="flex items-center justify-between text-[10px]">
               <span className="text-zinc-600">
-                {completedCount}/{challenges.length} completed
+                {completedCount}/{challenges.length}
               </span>
-              <div className="flex items-center gap-1 text-amber-500">
-                <Trophy size={12} />
-                <span className="font-medium">{totalXP} Total XP</span>
+              <div className="flex items-center gap-0.5 text-amber-500">
+                <Trophy size={10} />
+                <span className="font-medium">{totalXP} XP</span>
               </div>
             </div>
           </div>

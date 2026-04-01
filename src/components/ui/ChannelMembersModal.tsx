@@ -1,22 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Crown, UserMinus, Hash, Shield, MoreVertical, AlertCircle, RefreshCw, LogOut } from "lucide-react";
+import { X, Crown, UserMinus, Hash, Shield, AlertCircle, RefreshCw, LogOut } from "lucide-react";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 import type { ChannelMember } from "@/types/database";
-
-interface ChannelMembersModalProps {
-  channel: any;
-  members: ChannelMember[];
-  currentUserId: string;
-  onlineUsers: string[];
-  loading?: boolean;
-  error?: string | null;
-  onRemoveMember: (member: ChannelMember) => Promise<{ success?: boolean; error?: string }>;
-  onLeaveChannel?: () => Promise<{ success?: boolean; error?: string }>;
-  onRefresh?: () => void;
-  onClose: () => void;
-}
+import { getUsernameStyle, getTextColor } from "@/utils/fontStyles";
 
 const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
   indigo: { from: "#4f46e5", to: "#7c3aed" },
@@ -30,6 +18,19 @@ const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
   amber: { from: "#d97706", to: "#fbbf24" },
   slate: { from: "#334155", to: "#64748b" },
 };
+
+interface ChannelMembersModalProps {
+  channel: any;
+  members: ChannelMember[];
+  currentUserId: string;
+  onlineUsers: string[];
+  loading?: boolean;
+  error?: string | null;
+  onRemoveMember: (member: ChannelMember) => Promise<{ success?: boolean; error?: string }>;
+  onLeaveChannel?: () => Promise<{ success?: boolean; error?: string }>;
+  onRefresh?: () => void;
+  onClose: () => void;
+}
 
 export function ChannelMembersModal({
   channel,
@@ -76,54 +77,44 @@ export function ChannelMembersModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="relative w-full max-w-md animate-scale-in">
-        <div
-          className="absolute -inset-1 rounded-2xl"
-          style={{
-            background: `linear-gradient(135deg, ${color.from}20, ${color.to}20)`,
-            filter: "blur(20px)",
-          }}
-        />
-
         <div className="relative bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
-          <div className="p-4 border-b border-white/5 shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: `linear-gradient(135deg, ${color.from}, ${color.to})`,
-                  }}
-                >
-                  {hasEmoji ? (
-                    <span className="text-lg">{emoji}</span>
-                  ) : (
-                    <Hash size={18} className="text-white/80" />
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-white">Channel Members</h2>
-                  <p className="text-[10px] text-zinc-500">
-                    {loading ? "Loading..." : `${members.length} member${members.length !== 1 ? "s" : ""} in #${channel?.name}`}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {onRefresh && (
-                  <button
-                    onClick={onRefresh}
-                    className="p-2 hover:bg-white/5 rounded-lg text-zinc-500 hover:text-white transition-colors"
-                    title="Refresh"
-                  >
-                    <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                  </button>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{
+                  background: `linear-gradient(135deg, ${color.from}, ${color.to})`,
+                }}
+              >
+                {hasEmoji ? (
+                  <span className="text-sm">{emoji}</span>
+                ) : (
+                  <Hash size={14} className="text-white/80" />
                 )}
-                <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-white/5 rounded-lg text-zinc-500 hover:text-white transition-colors"
-                >
-                  <X size={18} />
-                </button>
               </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Members</h2>
+                <p className="text-[10px] text-zinc-500">
+                  {loading ? "..." : `${members.length} in #${channel?.name}`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {onRefresh && (
+                <button
+                  onClick={onRefresh}
+                  className="p-1.5 hover:bg-white/5 rounded text-zinc-500 hover:text-white transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-1.5 hover:bg-white/5 rounded text-zinc-500 hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
 
@@ -154,69 +145,50 @@ export function ChannelMembersModal({
               return (
                 <div
                   key={member.id}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group"
+                  className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors group"
                 >
-                  <div className="relative">
-                    <AvatarWithEffect
-                      profile={member.profile}
-                      size="md"
-                      showStatus={true}
-                      isOnline={online}
-                    />
-                    {online && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-zinc-950" />
-                    )}
-                  </div>
+                  <AvatarWithEffect
+                    profile={member.profile}
+                    size="sm"
+                    showStatus={true}
+                    isOnline={online}
+                  />
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white truncate">
-                        {member.profile?.username || "Unknown User"}
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-medium text-white truncate" style={getUsernameStyle(member.profile?.font_style)}>
+                        <span style={{ color: getTextColor(member.profile?.text_color) }}>
+                          {member.profile?.username || "Unknown"}
+                        </span>
                         {isSelf && (
-                          <span className="ml-2 text-[10px] text-indigo-400">(you)</span>
+                          <span className="ml-1 text-[9px] text-indigo-400">(you)</span>
                         )}
                       </p>
                       {member.role === "owner" && (
-                        <Crown size={12} className="text-amber-500 shrink-0" />
+                        <Crown size={10} className="text-amber-500 shrink-0" />
                       )}
                     </div>
-                    <p className="text-[10px] text-zinc-500">
+                    <p className="text-[9px] text-zinc-500">
                       {online ? (
                         <span className="text-emerald-500">Online</span>
                       ) : (
-                        `Joined ${new Date(member.joined_at).toLocaleDateString()}`
+                        new Date(member.joined_at).toLocaleDateString()
                       )}
                     </p>
                   </div>
 
                   {canRemove(member) && (
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setOpenMenuId(openMenuId === member.id ? null : member.id)
-                        }
-                        className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-
-                      {openMenuId === member.id && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl py-1 z-50 animate-scale-in">
-                          <button
-                            onClick={() => handleRemove(member)}
-                            disabled={removingId === member.id}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                          >
-                            {removingId === member.id ? (
-                              <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-400 rounded-full animate-spin" />
-                            ) : (
-                              <UserMinus size={14} />
-                            )}
-                            Remove from channel
-                          </button>
-                        </div>
+                    <button
+                      onClick={() => handleRemove(member)}
+                      disabled={removingId === member.id}
+                      className="p-1 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      {removingId === member.id ? (
+                        <div className="w-3 h-3 border border-red-500/30 border-t-red-400 rounded-full animate-spin" />
+                      ) : (
+                        <UserMinus size={12} />
                       )}
-                    </div>
+                    </button>
                   )}
                 </div>
               );
@@ -231,7 +203,7 @@ export function ChannelMembersModal({
           </div>
 
           {onLeaveChannel && !isCurrentUserOwner && (
-            <div className="p-4 border-t border-white/5 bg-black/20">
+            <div className="px-4 py-3 border-t border-white/5 bg-black/20">
               <button
                 onClick={async () => {
                   setLeaving(true);
@@ -239,12 +211,12 @@ export function ChannelMembersModal({
                   setLeaving(false);
                 }}
                 disabled={leaving}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold text-sm rounded-xl transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-red-400 text-xs font-medium hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
               >
                 {leaving ? (
-                  <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-400 rounded-full animate-spin" />
+                  <div className="w-3 h-3 border border-red-500/30 border-t-red-400 rounded-full animate-spin" />
                 ) : (
-                  <LogOut size={16} />
+                  <LogOut size={12} />
                 )}
                 Leave Channel
               </button>
