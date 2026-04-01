@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useChatStore } from "@/store/useChatStore";
 import { LogOut, Hash, Settings, X, Plus, Shield, Pencil, UserPlus, Users, Globe } from "lucide-react";
@@ -45,9 +46,14 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
     const creator = allProfiles.find((p: any) => p.id === creatorId);
     return creator?.username || null;
   };
-  
+
   const userChannels = channels.filter((c: any) => c.is_official);
   const myChannels = channels.filter((c: any) => c.created_by === myProfile?.id);
+  const joinedChannels = channels.filter((c: any) => {
+    if (c.is_official) return false;
+    if (c.created_by === myProfile?.id) return false;
+    return true;
+  });
 
   const canEditChannel = (channel: any) => {
     return channel.created_by === myProfile?.id || (isAdmin && channel.is_official);
@@ -190,6 +196,19 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
               <span className="text-[9px] text-zinc-600">{myChannels.length}/3</span>
             </div>
             {myChannels.map((chan: any) => renderChannelItem(chan, false, false, true))}
+          </div>
+        )}
+
+        {/* Joined Channels */}
+        {joinedChannels.length > 0 && (
+          <div className="p-2 border-t border-white/5">
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                Joined
+              </span>
+              <span className="text-[9px] text-zinc-600">{joinedChannels.length}</span>
+            </div>
+            {joinedChannels.map((chan: any) => renderChannelItem(chan, false, false, false))}
           </div>
         )}
         

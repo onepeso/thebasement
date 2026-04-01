@@ -12,6 +12,7 @@ export function useInvites(userId?: string) {
   const fetchingRef = useRef(false);
   const userIdRef = useRef(userId);
   const isSubscribedRef = useRef(false);
+  const inviteListUpdatedRef = useRef<(() => void) | null>(null);
 
   const fetchInvites = useCallback(async () => {
     if (!userId || userId !== userIdRef.current) return;
@@ -113,6 +114,18 @@ export function useInvites(userId?: string) {
       return { error: "You cannot invite yourself" };
     }
 
+    const { data: channelData } = await supabase
+      .from('channels')
+      .select('name')
+      .eq('id', channelId)
+      .single();
+
+    const { data: inviterData } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', userId)
+      .single();
+
     const { data, error } = await supabase
       .from("channel_invites")
       .insert({
@@ -136,6 +149,14 @@ export function useInvites(userId?: string) {
     }
 
     if (data) {
+      await supabase.from("user_notifications").insert({
+        user_id: invitedUserId,
+        type: 'invite',
+        title: `${inviterData?.username || 'Someone'} invited you`,
+        body: `Join #${channelData?.name || 'a channel'}`,
+        channel_id: channelId,
+      });
+
       setSentInvites((prev) => {
         if (prev.some((i) => i.id === data.id)) return prev;
         return [data, ...prev];
@@ -157,7 +178,28 @@ export function useInvites(userId?: string) {
       return { error: error.message };
     }
 
+    await supabase.from("channel_members").insert({
+      channel_id: invite.channel_id,
+      user_id: userId,
+      role: "member",
+    });
+
+    const { data: channelData } = await supabase
+      .from('channels')
+      .select('name')
+      .eq('id', invite.channel_id)
+      .single();
+
+    await supabase.from("user_notifications").insert({
+      user_id: invite.inviter_id,
+      type: 'system',
+      title: 'Invite accepted',
+      body: `${userId} joined #${channelData?.name || 'channel'}`,
+      channel_id: invite.channel_id,
+    });
+
     setPendingInvites((prev) => prev.filter((i) => i.id !== invite.id));
+    inviteListUpdatedRef.current?.();
     return { success: true };
   };
 

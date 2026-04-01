@@ -8,6 +8,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { useReactions } from "@/hooks/useReactions";
 import { usePinnedMessages } from "@/hooks/usePinnedMessages";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { useTyping } from "@/hooks/useTyping";
 import { useUpdate } from "@/hooks/useUpdate";
 import { useChallenges } from "@/hooks/useChallenges";
@@ -73,6 +74,7 @@ export default function Home() {
   const hasRestoredChannel = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<{ focus: () => void } | null>(null);
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
 
   const onlineUsers = usePresence(session?.user?.id);
   const { messages, hasMore, loading, loadingMore, loadMore, deleteMessage } = useChat(activeChannel?.id, session?.user?.id);
@@ -186,6 +188,7 @@ export default function Home() {
   const { reactions, toggleReaction } = useReactions(activeChannel?.id);
   const { pinMessage, unpinMessage, isPinned } = usePinnedMessages(activeChannel?.id);
   const { checkForMention, checkForNewMessage } = useNotifications(session?.user?.id, myProfile?.username);
+  useRealtimeNotifications(session?.user?.id);
 
   useEffect(() => {
     if (!messages.length || !activeChannel?.name) return;
@@ -203,27 +206,74 @@ export default function Home() {
 
   useEffect(() => {
     const fetchChannels = async () => {
+      // Fetch public channels and channels user is a member of
+      const { data: memberData } = await supabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('user_id', session?.user?.id);
+
+      const channelIds = memberData?.map((m: any) => m.channel_id) || [];
+
       const { data } = await supabase
         .from("channels")
         .select("*")
         .order("name");
+
       if (data) {
-        setChannels(data);
+        // Filter to show: public channels OR channels user is member of OR channels user created
+        const filteredChannels = data.filter((c: any) => {
+          return !c.is_private || c.created_by === session?.user?.id || channelIds.includes(c.id);
+        });
+        setChannels(filteredChannels);
         if (!hasRestoredChannel.current) {
           hasRestoredChannel.current = true;
-          // Check if we have a persisted active channel
           const persistedChannel = useChatStore.getState().activeChannel;
-          if (persistedChannel?.id && data.find((c: any) => c.id === persistedChannel.id)) {
-            // Keep the persisted channel
+          if (persistedChannel?.id && filteredChannels.find((c: any) => c.id === persistedChannel.id)) {
             return;
           }
-          // Otherwise, set to general or first channel
-          setActiveChannel(data.find((c: any) => c.slug === "general") || data[0]);
+          setActiveChannel(filteredChannels.find((c: any) => c.slug === "general") || filteredChannels[0]);
         }
       }
     };
     fetchChannels();
-  }, [setChannels, setActiveChannel]);
+  }, [setChannels, setActiveChannel, session?.user?.id]);
+
+  useEffect(() => {
+    const fetchMemberCounts = async () => {
+      const channelIds = channels.map((c: any) => c.id);
+      if (channelIds.length === 0) return;
+
+      const { data } = await supabase
+        .from('channel_members')
+        .select('channel_id')
+        .in('channel_id', channelIds);
+
+      if (data) {
+        const counts: Record<string, number> = {};
+        data.forEach((m: any) => {
+          counts[m.channel_id] = (counts[m.channel_id] || 0) + 1;
+        });
+        setMemberCounts(counts);
+      }
+    };
+
+    fetchMemberCounts();
+
+    const channel = supabase
+      .channel('member-count-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'channel_members',
+      }, () => {
+        fetchMemberCounts();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [channels.length]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -385,7 +435,7 @@ export default function Home() {
             onInvite={(channel) => setInvitingChannel(channel)}
             onViewMembers={(channel) => setViewingMembersChannel(channel)}
             onDiscover={() => setShowDiscovery(true)}
-            memberCounts={{}}
+            memberCounts={memberCounts}
           />
         </div>
 
@@ -723,7 +773,7 @@ export default function Home() {
               onInvite={(channel) => { setShowMobileSidebar(false); setInvitingChannel(channel); }}
               onViewMembers={(channel) => { setShowMobileSidebar(false); setViewingMembersChannel(channel); }}
               onDiscover={() => { setShowMobileSidebar(false); setShowDiscovery(true); }}
-              memberCounts={{}}
+              memberCounts={memberCounts}
             />
           </div>
         )}

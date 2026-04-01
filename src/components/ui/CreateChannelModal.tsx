@@ -57,6 +57,7 @@ export function CreateChannelModal({ userId, onClose, onChannelCreated }: Create
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [accentColor, setAccentColor] = useState("white");
   const [showAccentPicker, setShowAccentPicker] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const myChannels = channels.filter((c: any) => c.created_by === userId);
@@ -90,6 +91,7 @@ export function CreateChannelModal({ userId, onClose, onChannelCreated }: Create
         accent_color: accentColor,
         created_by: userId,
         is_official: false,
+        is_private: isPrivate,
       })
       .select()
       .single();
@@ -257,6 +259,20 @@ export function CreateChannelModal({ userId, onClose, onChannelCreated }: Create
                 rows={2}
                 className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-xl text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-all resize-none"
               />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-zinc-900/30 rounded-xl border border-white/5">
+              <div>
+                <p className="text-sm font-medium text-zinc-300">Private Channel</p>
+                <p className="text-[10px] text-zinc-500">Only invited members can join</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPrivate(!isPrivate)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${isPrivate ? 'bg-indigo-600' : 'bg-zinc-700'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isPrivate ? 'left-7' : 'left-1'}`} />
+              </button>
             </div>
           </div>
 
