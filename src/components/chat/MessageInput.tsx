@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Send, AtSign, X, Clock, Reply } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
@@ -16,6 +16,7 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
   onMessageSent?: () => void;
   onReplySent?: () => void;
   onMentionSent?: () => void;
+  onOptimisticMessage?: (message: any) => void;
 }>(function MessageInput({
   channelId,
   userId,
@@ -26,6 +27,7 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
   onMessageSent,
   onReplySent,
   onMentionSent,
+  onOptimisticMessage,
 }, ref) {
   const [input, setInput] = useState("");
   const [showMentions, setShowMentions] = useState(false);
@@ -101,15 +103,52 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
       return; // Toast already shown by useSpamProtection
     }
 
+    const text = input;
+    const replyToId = replyTo?.id;
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const createdAt = new Date().toISOString();
+
+    const optimisticMessage = {
+      id: optimisticId,
+      text,
+      channel_id: channelId,
+      user_id: userId,
+      user_name: username,
+      reply_to_id: replyToId,
+      created_at: createdAt,
+      is_optimistic: true,
+      profiles: {
+        id: userId,
+        username: username,
+        avatar_url: null,
+        avatar_effect: null,
+      },
+      reply_to: replyToId ? { id: replyToId, text: replyTo.text, profiles: { username: replyTo.username } } : null,
+    };
+
+    onOptimisticMessage?.(optimisticMessage);
+
+    recordMessage();
+    setInput("");
+    clearReplyTo();
+    
+    onMessageSent?.();
+    if (replyToId) {
+      onReplySent?.();
+    }
+    if (text.includes('@')) {
+      onMentionSent?.();
+    }
+
     const insertData: Record<string, string> = {
-      text: input,
+      text,
       channel_id: channelId,
       user_id: userId,
       user_name: username,
     };
     
-    if (replyTo?.id) {
-      insertData.reply_to_id = replyTo.id;
+    if (replyToId) {
+      insertData.reply_to_id = replyToId;
     }
 
     const { error } = await supabase.from("messages").insert([insertData]);
@@ -117,18 +156,6 @@ export const MessageInput = forwardRef<{ focus: () => void }, {
     if (error) {
       console.error("Insert Error:", error);
       toast.error("Failed to send message");
-    } else {
-      recordMessage();
-      setInput("");
-      clearReplyTo();
-      
-      onMessageSent?.();
-      if (replyTo?.id) {
-        onReplySent?.();
-      }
-      if (input.includes('@')) {
-        onMentionSent?.();
-      }
     }
   };
 

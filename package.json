@@ -9,14 +9,17 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:ios": "tauri build --target ios",
+    "tauri:android": "tauri build --target android",
+    "tauri:android:dev": "tauri dev --target android"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
     "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-notification": "^2.3.3",
-    "@tauri-apps/plugin-process": "^2.3.1",
-    "@tauri-apps/plugin-updater": "^2.10.0",
+    "@tauri-apps/plugin-notification": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "react": "19.2.3",

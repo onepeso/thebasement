@@ -19,6 +19,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
     const channelIdRef = useRef(channelId);
     const isSubscribedRef = useRef(false);
     const initialFetchDoneRef = useRef(false);
+    const optimisticMessagesRef = useRef<Set<string>>(new Set());
 
     const fetchData = useCallback(async (skipCache = false) => {
         if (!channelId || !userId || channelId !== channelIdRef.current) return;
@@ -143,9 +144,21 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 try {
                     const newMsg = JSON.parse(JSON.stringify(payload.new)) as any; 
                     
+                    if (newMsg.is_optimistic) return;
+                    
+                    if (newMsg.user_id === userId) {
+                        const optimisticMsg = Array.from(optimisticMessagesRef.current).find(id => {
+                            return true;
+                        });
+                        if (optimisticMsg) {
+                            optimisticMessagesRef.current.delete(optimisticMsg as string);
+                            setMessages(prev => prev.filter((m: any) => m.id !== optimisticMsg));
+                        }
+                    }
+                    
                     const { data: profileData } = await supabase
                         .from('profiles')
-                        .select('id, username, avatar_url, bio, status, avatar_effect, avatar_overlays')
+                        .select('id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color')
                         .eq('id', newMsg.user_id)
                         .single();
                     
@@ -154,15 +167,9 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                     }
                     
                     if (newMsg.reply_to_id) {
-                        const { data: replyData } = await supabase
-                            .from('profiles')
-                            .select('id, username, avatar_url, bio, status, avatar_effect, avatar_overlays')
-                            .eq('id', newMsg.user_id)
-                            .single();
-                        
                         const { data: replyMsg } = await supabase
                             .from('messages')
-                            .select('id, text, user_id, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays)')
+                            .select('id, text, user_id, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                             .eq('id', newMsg.reply_to_id)
                             .single();
                         
@@ -176,7 +183,6 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                         return [...prev, newMsg];
                     });
                     
-                    // Call onNewMessage callback and update unread counts
                     const lastRead = lastReadTimestamps[channelIdRef.current || ''] || '1970-01-01';
                     if (newMsg.user_id !== userId && new Date(newMsg.created_at) > new Date(lastRead)) {
                         onNewMessage?.(newMsg);
@@ -288,5 +294,21 @@ export function useChat(channelId: string | undefined, userId: string | undefine
         });
     }, [messageCache, setMessageCache]);
 
-    return { messages, hasMore, loading, loadingMore, error, loadMore, deleteMessage };
+    const addOptimisticMessage = useCallback((message: any) => {
+        optimisticMessagesRef.current.add(message.id);
+        setMessages(prev => [...prev, message]);
+        
+        const currentChannelId = channelIdRef.current;
+        if (currentChannelId) {
+            const cached = messageCache[currentChannelId];
+            if (cached) {
+                setMessageCache(currentChannelId, {
+                    ...cached,
+                    messages: [...cached.messages, message]
+                });
+            }
+        }
+    }, [messageCache, setMessageCache]);
+
+    return { messages, hasMore, loading, loadingMore, error, loadMore, deleteMessage, addOptimisticMessage };
 }

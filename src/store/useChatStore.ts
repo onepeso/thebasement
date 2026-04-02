@@ -77,6 +77,10 @@ interface ChatStore {
   lastReadTimestamps: Record<string, string>;
   unreadCounts: Record<string, number>;
   
+  // Sequence tracking for efficient reconnect
+  channelSequence: Record<string, number>;
+  lastEventTimestamp: string | null;
+  
   reactions: Record<string, Reaction[]>;
   pinnedMessages: PinnedMessage[];
   searchQuery: string;
@@ -88,6 +92,9 @@ interface ChatStore {
   dismissedUpdateVersion: string | null;
   showKeyboardShortcuts: boolean;
   setShowKeyboardShortcuts: (show: boolean) => void;
+  
+  setChannelSequence: (channelId: string, sequence: number) => void;
+  setLastEventTimestamp: (timestamp: string) => void;
   
   // Message cache
   messageCache: Record<string, {
@@ -143,6 +150,8 @@ export const useChatStore = create<ChatStore>()(
       isTabVisible: true,
       lastReadTimestamps: {},
       unreadCounts: {},
+      channelSequence: {},
+      lastEventTimestamp: null,
       
       reactions: {},
       pinnedMessages: [],
@@ -294,6 +303,12 @@ export const useChatStore = create<ChatStore>()(
       }),
       
       setShowKeyboardShortcuts: (show: boolean) => set({ showKeyboardShortcuts: show }),
+      
+      setChannelSequence: (channelId, sequence) => set((state) => ({
+        channelSequence: { ...state.channelSequence, [channelId]: sequence }
+      })),
+      
+      setLastEventTimestamp: (timestamp) => set({ lastEventTimestamp: timestamp }),
       
       setMessageCache: (channelId, data) => set((state) => ({
         messageCache: {

@@ -10,6 +10,7 @@ import { usePinnedMessages } from "@/hooks/usePinnedMessages";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { usePeriodicRefresh } from "@/hooks/usePeriodicRefresh";
+import { useRealtimeChannels } from "@/hooks/useRealtimeChannels";
 import { useTyping } from "@/hooks/useTyping";
 import { useUpdate } from "@/hooks/useUpdate";
 import { useChallenges } from "@/hooks/useChallenges";
@@ -93,7 +94,7 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const onlineUsers = usePresence(session?.user?.id);
-  const { messages, hasMore, loading, loadingMore, loadMore, deleteMessage } = useChat(activeChannel?.id, session?.user?.id);
+  const { messages, hasMore, loading, loadingMore, loadMore, deleteMessage, addOptimisticMessage } = useChat(activeChannel?.id, session?.user?.id);
   const unreadCount = messages.filter(
     (m) => m.user_id !== session?.user?.id &&
     new Date(m.created_at) > new Date(lastReadTimestamps[activeChannel?.id || ''] || '1970-01-01')
@@ -211,6 +212,12 @@ export default function Home() {
     onRefreshActiveChannel: setActiveChannel,
     onRefreshMemberCounts: setMemberCounts,
     onRefreshNotifications: setNotificationsDeduped,
+  });
+
+  useRealtimeChannels({
+    userId: session?.user?.id,
+    onChannelsChange: setChannels,
+    onMemberCountsChange: setMemberCounts,
   });
 
   useEffect(() => {
@@ -830,6 +837,7 @@ export default function Home() {
                   onMessageSent={handleMessageSent}
                   onReplySent={trackReply}
                   onMentionSent={trackMention}
+                  onOptimisticMessage={addOptimisticMessage}
                 />
               </>
             )}
