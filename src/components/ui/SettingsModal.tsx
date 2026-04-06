@@ -4,7 +4,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { useToast } from '@/store/useToastStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpdate } from '@/hooks/useUpdate';
-import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star, Type } from 'lucide-react';
+import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star, Type, Trash2, AlertTriangle, Check, Loader2, ChevronRight } from 'lucide-react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getVersion } from '@tauri-apps/api/app';
 import type { UserStatus, BadgeWithStatus } from '@/types/database';
@@ -119,6 +119,7 @@ const SIDEBAR_TABS = [
   { id: 'status', label: 'Status', icon: Circle },
   { id: 'notifications', label: 'Notifications', icon: BellRing },
   { id: 'gamification', label: 'Gamification', icon: Trophy },
+  { id: 'account', label: 'Account', icon: User },
   { id: 'about', label: 'About', icon: Info },
 ];
 
@@ -181,6 +182,13 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
   const [notifPermission, setNotifPermission] = useState(false);
   const [appVersion, setAppVersion] = useState('1.0.0');
   const [highlightedBadges, setHighlightedBadges] = useState<string[]>([]);
+  const [deleteStep, setDeleteStep] = useState<number>(0);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+  const [messageCount, setMessageCount] = useState<number | null>(null);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
@@ -208,6 +216,19 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
     }
     if (showSettings) checkPermission();
   }, [showSettings]);
+
+  useEffect(() => {
+    async function fetchMessageCount() {
+      if (activeTab === 'account' && session?.user?.id) {
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+        setMessageCount(count || 0);
+      }
+    }
+    fetchMessageCount();
+  }, [activeTab, session?.user?.id]);
 
   const handleRequestPermission = async () => {
     const permission = await requestPermission();
@@ -624,6 +645,219 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Account Tab - Delete Account */}
+              {activeTab === 'account' && !deleteSuccess && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                        <AlertTriangle size={20} className="text-red-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-white">Delete Account</h3>
+                        <p className="text-xs text-red-400/80">This action cannot be undone</p>
+                      </div>
+                    </div>
+                    
+                    {deleteStep === 0 && (
+                      <div className="space-y-4">
+                        <p className="text-xs text-zinc-400">
+                          Permanently delete your account and all associated data. This process is <strong className="text-white">irreversible</strong>.
+                        </p>
+                        
+                        <div className="bg-zinc-900/50 rounded-lg p-3 space-y-2">
+                          <h4 className="text-xs font-semibold text-white">The following will be permanently deleted:</h4>
+                          <ul className="text-xs text-zinc-400 space-y-1">
+                            <li className="flex items-center gap-2">
+                              <X size={12} className="text-red-400" /> Your account and profile
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <X size={12} className="text-red-400" /> {messageCount || 0} messages you've sent
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <X size={12} className="text-red-400" /> Your avatar and customization settings
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <X size={12} className="text-red-400" /> All badges and XP progress
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <X size={12} className="text-red-400" /> Your channel memberships
+                            </li>
+                          </ul>
+                        </div>
+                        
+                        <button
+                          onClick={() => setDeleteStep(1)}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-all"
+                        >
+                          <Trash2 size={14} /> Continue with Deletion
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
+                    
+                    {deleteStep === 1 && (
+                      <div className="space-y-4">
+                        <p className="text-xs text-zinc-400">
+                          Enter your password to verify your identity.
+                        </p>
+                        
+                        <input
+                          type="password"
+                          value={deletePassword}
+                          onChange={(e) => setDeletePassword(e.target.value)}
+                          placeholder="Enter your password"
+                          className="w-full bg-zinc-900/80 p-3 rounded-lg border border-white/10 text-white text-sm placeholder:text-zinc-600 outline-none focus:border-red-500/50"
+                        />
+                        
+                        {deleteError && (
+                          <div className="p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-xs text-red-400">
+                            {deleteError}
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setDeleteStep(0); setDeletePassword(''); setDeleteError(''); }}
+                            className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!deletePassword) {
+                                setDeleteError('Please enter your password');
+                                return;
+                              }
+                              setDeleteLoading(true);
+                              setDeleteError('');
+                              
+                              const { error } = await supabase.auth.signInWithPassword({
+                                email: session?.user?.email || '',
+                                password: deletePassword
+                              });
+                              
+                              if (error) {
+                                setDeleteError('Incorrect password. Please try again.');
+                                setDeleteLoading(false);
+                              } else {
+                                setDeleteStep(2);
+                                setDeleteLoading(false);
+                              }
+                            }}
+                            disabled={deleteLoading}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-all"
+                          >
+                            {deleteLoading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                            Verify
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {deleteStep === 2 && (
+                      <div className="space-y-4">
+                        <p className="text-xs text-zinc-400">
+                          Type <strong className="text-red-400">DELETE</strong> to confirm permanent account deletion.
+                        </p>
+                        
+                        <input
+                          type="text"
+                          value={deleteConfirm}
+                          onChange={(e) => setDeleteConfirm(e.target.value.toUpperCase())}
+                          placeholder="Type DELETE to confirm"
+                          className="w-full bg-zinc-900/80 p-3 rounded-lg border border-white/10 text-white text-sm placeholder:text-zinc-600 outline-none focus:border-red-500/50 font-mono"
+                        />
+                        
+                        <button
+                          onClick={async () => {
+                            if (deleteConfirm !== 'DELETE') {
+                              setDeleteError('Please type DELETE exactly to confirm');
+                              return;
+                            }
+                            setDeleteLoading(true);
+                            setDeleteError('');
+                            
+                            try {
+                              const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+                              const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+                              const userId = session?.user?.id;
+                              
+                              if (!userId) {
+                                setDeleteError('Session expired. Please sign in again.');
+                                setDeleteLoading(false);
+                                return;
+                              }
+                              
+                              const response = await fetch(`${supabaseUrl}/functions/v1/delete-account`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'apikey': anonKey,
+                                  'Authorization': `Bearer ${anonKey}`
+                                },
+                                body: JSON.stringify({ userId })
+                              });
+                              
+                              if (!response.ok) {
+                                const data = await response.json();
+                                throw new Error(data.error || 'Failed to delete account');
+                              }
+                              
+                              setDeleteSuccess(true);
+                              await supabase.auth.signOut();
+                              window.location.reload();
+                            } catch (err: any) {
+                              setDeleteError(err.message || 'Failed to delete account. Please try again.');
+                              setDeleteLoading(false);
+                            }
+                          }}
+                          disabled={deleteLoading || deleteConfirm !== 'DELETE'}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-all"
+                        >
+                          {deleteLoading ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Deleting Account...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 size={14} />
+                              Permanently Delete My Account
+                            </>
+                          )}
+                        </button>
+                        
+                        {deleteError && (
+                          <div className="p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-xs text-red-400">
+                            {deleteError}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="bg-zinc-800/30 rounded-xl p-4 border border-white/5">
+                    <h4 className="text-xs font-semibold text-white mb-2">Your Rights Under CCPA</h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      As a California resident, you have the right to know what personal information is collected about you, to request deletion of your personal information, and to opt-out of the sale of your personal information. To exercise these rights, you may delete your account at any time through this feature.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'account' && deleteSuccess && (
+                <div className="space-y-4 animate-fade-in text-center py-8">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Check size={32} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Account Deletion Initiated</h3>
+                  <p className="text-sm text-zinc-400">
+                    Your account and all associated data will be permanently deleted. Thank you for using The Basement.
+                  </p>
                 </div>
               )}
 

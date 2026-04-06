@@ -22,6 +22,7 @@ export function useRealtimeChannels({
 
   const fetchMemberCounts = useCallback(async (channelIds: string[]) => {
     if (!channelIds.length || !onMemberCountsChange) return;
+    if (typeof userId !== 'string') return;
 
     const { data } = await supabase
       .from('channel_members')
@@ -40,6 +41,7 @@ export function useRealtimeChannels({
 
   useEffect(() => {
     if (!userId || !onChannelsChange) return;
+    if (typeof userId !== 'string') return;
 
     const channelIdsRef: string[] = [];
 

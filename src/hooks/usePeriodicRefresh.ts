@@ -26,6 +26,7 @@ export function usePeriodicRefresh({
 
   const refreshChannels = useCallback(async () => {
     if (!userId || !onRefreshChannels) return;
+    if (typeof userId !== 'string') return;
 
     const { data: memberData } = await supabase
       .from('channel_members')
@@ -78,6 +79,7 @@ export function usePeriodicRefresh({
 
   const refreshNotifications = useCallback(async () => {
     if (!userId || !onRefreshNotifications) return;
+    if (typeof userId !== 'string') return;
 
     const { data } = await supabase
       .from('user_notifications')
