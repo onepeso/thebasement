@@ -73,6 +73,12 @@ interface ChatStore {
   reduceMotion: boolean;
   isTabVisible: boolean;
   
+  // Blocked users
+  blockedIds: string[];
+  setBlockedIds: (ids: string[]) => void;
+  addBlockedId: (id: string) => void;
+  removeBlockedId: (id: string) => void;
+  
   // Per-channel last read timestamps
   lastReadTimestamps: Record<string, string>;
   unreadCounts: Record<string, number>;
@@ -137,6 +143,11 @@ interface ChatStore {
   
   setShowUpdatePopup: (show: boolean) => void;
   dismissUpdate: (version: string) => void;
+  
+  blockedIds: string[];
+  setBlockedIds: (ids: string[]) => void;
+  addBlockedId: (id: string) => void;
+  removeBlockedId: (id: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -163,10 +174,10 @@ export const useChatStore = create<ChatStore>()(
         directMessages: false,
         sound: true,
       },
-
-  showUpdatePopup: false,
-  dismissedUpdateVersion: null,
-  showKeyboardShortcuts: false,
+      showUpdatePopup: false,
+      dismissedUpdateVersion: null,
+      showKeyboardShortcuts: false,
+      blockedIds: [],
 
       // Message cache
       messageCache: {},
@@ -370,6 +381,15 @@ export const useChatStore = create<ChatStore>()(
         const { [channelId]: _, ...rest } = state.messageCache;
         return { messageCache: rest };
       }),
+      
+      blockedIds: [],
+      setBlockedIds: (ids) => set({ blockedIds: ids }),
+      addBlockedId: (id) => set((state) => ({ 
+        blockedIds: state.blockedIds.includes(id) ? state.blockedIds : [...state.blockedIds, id] 
+      })),
+      removeBlockedId: (id) => set((state) => ({ 
+        blockedIds: state.blockedIds.filter(bid => bid !== id) 
+      })),
     }),
     {
       name: 'thebasement-settings',

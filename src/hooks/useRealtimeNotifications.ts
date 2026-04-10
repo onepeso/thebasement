@@ -52,62 +52,43 @@ export function useRealtimeNotifications(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
 
-    const subscribeToNotifications = async () => {
-      // Ensure settings exist for user
-      const { data: existingSettings } = await supabase
-        .from('notification_settings')
-        .select('mentions, sound')
-        .eq('user_id', userId)
-        .single();
-      
-      if (!existingSettings) {
-        // Create default settings (ignore conflict errors)
-        const { error } = await supabase.from('notification_settings').insert({
-          user_id: userId,
-          mentions: true,
-          invites: true,
-          sound: true,
-        });
-        // Ignore 409 Conflict - record was created by another process
-        if (error && error.code !== '23505') {
-          console.error('Error creating notification settings:', error);
-          return;
-        }
-      }
-      
-      if (!existingSettings?.mentions) return;
-
-      const channel = supabase
-        .channel(`user-notifications:${userId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'user_notifications',
-            filter: `user_id=eq.${userId}`,
-          },
-          async (payload) => {
-            const notification = payload.new as NotificationData;
-            
-            // Mark as read immediately
-            await supabase
-              .from('user_notifications')
-              .update({ read: true })
-              .eq('id', notification.id);
-            
-            // Only notify for mentions
-            if (notification.type === 'mention') {
-              handleNotification(notification);
-            }
+    const channel = supabase
+      .channel(`user-notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        async (payload) => {
+          const notification = payload.new as NotificationData;
+          
+          await supabase
+            .from('user_notifications')
+            .update({ read: true })
+            .eq('id', notification.id);
+          
+          if (notification.type === 'mention') {
+            handleNotification(notification);
           }
-        )
-        .subscribe();
+        }
+      );
 
-      subscriptionRef.current = channel;
-    };
+    channel.subscribe();
 
-    subscribeToNotifications();
+    subscriptionRef.current = channel;
+
+    // Ensure settings exist
+    supabase
+      .from('notification_settings')
+      .upsert({
+        user_id: userId,
+        mentions: true,
+        invites: true,
+        sound: true,
+      }, { onConflict: 'user_id', ignoreDuplicates: true });
 
     return () => {
       if (subscriptionRef.current) {

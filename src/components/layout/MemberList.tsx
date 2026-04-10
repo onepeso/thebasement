@@ -11,9 +11,14 @@ interface MemberListProps {
 
 export function MemberList({ allProfiles, onlineUsers }: MemberListProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const blockedIds = useChatStore((state) => state.blockedIds);
   
-  const onlineCount = onlineUsers.length;
-  const offlineCount = allProfiles.length - onlineCount;
+  const filteredProfiles = allProfiles.filter(p => !blockedIds.includes(p.id));
+  const onlineFiltered = filteredProfiles.filter(p => onlineUsers.includes(p.id));
+  const offlineFiltered = filteredProfiles.filter(p => !onlineUsers.includes(p.id));
+
+  const onlineCount = onlineFiltered.length;
+  const offlineCount = offlineFiltered.length;
 
   return (
     <div className="border-t border-white/5">
@@ -46,24 +51,22 @@ export function MemberList({ allProfiles, onlineUsers }: MemberListProps) {
                 Online — {onlineCount}
               </p>
               <div className="space-y-0.5">
-                {allProfiles
-                  .filter(p => onlineUsers.includes(p.id))
-                  .map(profile => (
-                    <button
-                      key={profile.id}
-                      onClick={() => useChatStore.getState().setViewProfile(profile)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                    >
-                      <AvatarWithEffect 
-                        profile={profile} 
-                        size="sm"
-                        isOnline={true}
-                      />
-                      <span className="text-xs font-medium text-zinc-300 truncate">
-                        {profile.username}
-                      </span>
-                    </button>
-                  ))}
+                {onlineFiltered.map(profile => (
+                  <button
+                    key={profile.id}
+                    onClick={() => useChatStore.getState().setViewProfile(profile)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                  >
+                    <AvatarWithEffect 
+                      profile={profile} 
+                      size="sm"
+                      isOnline={true}
+                    />
+                    <span className="text-xs font-medium text-zinc-300 truncate">
+                      {profile.username}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -74,24 +77,22 @@ export function MemberList({ allProfiles, onlineUsers }: MemberListProps) {
                 Offline — {offlineCount}
               </p>
               <div className="space-y-0.5">
-                {allProfiles
-                  .filter(p => !onlineUsers.includes(p.id))
-                  .map(profile => (
-                    <button
-                      key={profile.id}
-                      onClick={() => useChatStore.getState().setViewProfile(profile)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors opacity-60 hover:opacity-100"
-                    >
-                      <AvatarWithEffect 
-                        profile={profile} 
-                        size="sm"
-                        isOnline={false}
-                      />
-                      <span className="text-xs font-medium text-zinc-400 truncate">
-                        {profile.username}
-                      </span>
-                    </button>
-                  ))}
+                {offlineFiltered.map(profile => (
+                  <button
+                    key={profile.id}
+                    onClick={() => useChatStore.getState().setViewProfile(profile)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors opacity-60 hover:opacity-100"
+                  >
+                    <AvatarWithEffect 
+                      profile={profile} 
+                      size="sm"
+                      isOnline={false}
+                    />
+                    <span className="text-xs font-medium text-zinc-400 truncate">
+                      {profile.username}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}

@@ -4,7 +4,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { useToast } from '@/store/useToastStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpdate } from '@/hooks/useUpdate';
-import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star, Type, Trash2, AlertTriangle, Check, Loader2, ChevronRight } from 'lucide-react';
+import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star, Type, Trash2, AlertTriangle, Check, Loader2, ChevronRight, Shield, Ban, UserX } from 'lucide-react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getVersion } from '@tauri-apps/api/app';
 import type { UserStatus, BadgeWithStatus } from '@/types/database';
@@ -13,6 +13,7 @@ import { getUsernameStyle } from '@/utils/fontStyles';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { FontStyleId, TextColorId } from '@/types/database';
+import { AdminReportsDashboard } from './AdminReportsDashboard';
 
 const AVATAR_SEEDS = ['cool', 'tech', 'gamer', 'bit', 'shade', 'neo', 'pixel', 'basement', 'vapor', 'retro', 'funky', 'bottts'];
 
@@ -120,6 +121,8 @@ const SIDEBAR_TABS = [
   { id: 'notifications', label: 'Notifications', icon: BellRing },
   { id: 'gamification', label: 'Gamification', icon: Trophy },
   { id: 'account', label: 'Account', icon: User },
+  { id: 'blocked', label: 'Blocked', icon: Ban },
+  { id: 'admin', label: 'Admin', icon: Shield },
   { id: 'about', label: 'About', icon: Info },
 ];
 
@@ -171,6 +174,7 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
   const { update: updateInfo, isChecking, isDownloading, downloadProgress, checkForUpdates, downloadAndInstall } = useUpdate();
   
   const [activeTab, setActiveTab] = useState('profile');
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [editUsername, setEditUsername] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editStatus, setEditStatus] = useState<UserStatus>('online');
@@ -189,6 +193,9 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
   const [deleteError, setDeleteError] = useState('');
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [messageCount, setMessageCount] = useState<number | null>(null);
+  const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
+  const [blockedLoading, setBlockedLoading] = useState(false);
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
@@ -238,6 +245,82 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
   const handleTestNotification = () => {
     sendNotification({ title: '🔔 The Basement', body: 'Notifications are working!' });
   };
+
+  const fetchBlockedUsers = async () => {
+    setBlockedLoading(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.user?.id) {
+        setBlockedLoading(false);
+        return;
+      }
+      
+      const { data: blockedData } = await supabase
+        .from('blocked_users')
+        .select('*')
+        .eq('user_id', authSession.user.id);
+      
+      if (!blockedData || blockedData.length === 0) {
+        setBlockedUsers([]);
+        useChatStore.getState().setBlockedIds([]);
+        setBlockedLoading(false);
+        return;
+      }
+      
+      const blockedIdsList = blockedData.map(b => b.blocked_user_id);
+      useChatStore.getState().setBlockedIds(blockedIdsList);
+      
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', blockedIdsList);
+      
+      const profileMap: Record<string, any> = {};
+      profiles?.forEach(p => { profileMap[p.id] = p; });
+      
+      const blockedWithProfiles = blockedData.map(b => ({
+        ...b,
+        blocked_user: profileMap[b.blocked_user_id] || null,
+      }));
+      
+      setBlockedUsers(blockedWithProfiles);
+    } catch (err) {
+      console.error('Error fetching blocked users:', err);
+    }
+    setBlockedLoading(false);
+  };
+
+  const handleUnblock = async (blockedUserId: string) => {
+    if (!session?.user?.id) return;
+    setUnblockingId(blockedUserId);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const token = authSession?.access_token || session.access_token;
+      
+      const res = await fetch('/api/block', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ blocked_user_id: blockedUserId }),
+      });
+      if (res.ok) {
+        setBlockedUsers(prev => prev.filter(u => u.blocked_user_id !== blockedUserId));
+        useChatStore.getState().removeBlockedId(blockedUserId);
+        toast.success('User unblocked');
+      }
+    } catch (err) {
+      console.error('Error unblocking:', err);
+    }
+    setUnblockingId(null);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'blocked') {
+      fetchBlockedUsers();
+    }
+  }, [activeTab]);
 
   if (!showSettings) return null;
 
@@ -861,6 +944,73 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
                 </div>
               )}
 
+              {/* Blocked Users Tab */}
+              {activeTab === 'blocked' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="text-center py-4">
+                    <Ban size={32} className="mx-auto mb-2 text-amber-400" />
+                    <h2 className="text-sm font-bold text-white">Blocked Users</h2>
+                    <p className="text-xs text-zinc-500">Manage who you have blocked</p>
+                  </div>
+                  
+                  {blockedLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                    </div>
+                  ) : blockedUsers.length === 0 ? (
+                    <div className="text-center py-8 text-zinc-500">
+                      <UserX size={32} className="mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No blocked users</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {blockedUsers.map((blocked) => (
+                        <div
+                          key={blocked.id}
+                          className="flex items-center justify-between px-4 py-3 bg-zinc-800/50 rounded-lg border border-white/5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={blocked.blocked_user?.avatar_url || `https://ui-avatars.com/api/?name=${blocked.blocked_user?.username || 'U'}`}
+                              alt=""
+                              className="w-8 h-8 rounded-full bg-zinc-700"
+                            />
+                            <span className="text-sm text-white">
+                              {blocked.blocked_user?.username || 'Unknown User'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleUnblock(blocked.blocked_user_id)}
+                            disabled={unblockingId === blocked.blocked_user_id}
+                            className="px-3 py-1.5 text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {unblockingId === blocked.blocked_user_id ? 'Unblocking...' : 'Unblock'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Admin Tab */}
+              {activeTab === 'admin' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="text-center py-4">
+                    <Shield size={32} className="mx-auto mb-2 text-red-400" />
+                    <h2 className="text-sm font-bold text-white">Admin Dashboard</h2>
+                    <p className="text-xs text-zinc-500">Review user reports and content moderation</p>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowAdminDashboard(true)}
+                    className="w-full px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 hover:bg-red-500/20 transition-colors"
+                  >
+                    Open Reports Dashboard
+                  </button>
+                </div>
+              )}
+
               {/* About Tab */}
               {activeTab === 'about' && (
                 <div className="space-y-4 animate-fade-in">
@@ -904,7 +1054,7 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
               )}
             </div>
 
-            {activeTab !== 'about' && (
+            {activeTab !== 'about' && activeTab !== 'admin' && activeTab !== 'blocked' && (
               <div className="px-4 py-3 border-t border-white/5 bg-black/20 shrink-0">
                 <div className="flex gap-2">
                   <button onClick={handleSave} className="flex-1 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
@@ -919,6 +1069,10 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
           </div>
         </div>
       </div>
+
+      {showAdminDashboard && (
+        <AdminReportsDashboard onClose={() => setShowAdminDashboard(false)} />
+      )}
     </div>
   );
 }

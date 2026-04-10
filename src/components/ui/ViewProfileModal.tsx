@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Circle, Zap, Trophy, Star, Flame, Sparkles, MessageSquare, ThumbsUp, Pin, CornerDownRight, AtSign, Construction, Heart, UserPlus, PartyPopper, Award } from 'lucide-react';
+import { X, Circle, Zap, Trophy, Star, Flame, Sparkles, MessageSquare, ThumbsUp, Pin, CornerDownRight, AtSign, Construction, Heart, UserPlus, PartyPopper, Award, MoreVertical, ShieldAlert, Ban, Check } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/store/useChatStore';
@@ -104,11 +104,126 @@ const getChallengeIcon = (challenge: Challenge): LucideIcon => {
 
 export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
   const { viewProfile, setViewProfile } = useChatStore();
-  const { allProfiles } = useAuth();
+  const { allProfiles, session } = useAuth();
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
   const [userBadges, setUserBadges] = useState<any[]>([]);
   const [allBadges, setAllBadges] = useState<BadgeWithStatus[]>([]);
   const [loadingChallenges, setLoadingChallenges] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string>('');
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => {
+    if (!viewProfile?.id || !session?.user?.id) return;
+    
+    const checkBlocked = async () => {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.user?.id) return;
+      
+      const { data } = await supabase
+        .from('blocked_users')
+        .select('id')
+        .eq('user_id', authSession.user.id)
+        .eq('blocked_user_id', viewProfile.id)
+        .single();
+      setIsBlocked(!!data);
+    };
+    
+    checkBlocked();
+  }, [viewProfile?.id, session?.user?.id]);
+
+  const handleBlock = async () => {
+    if (!viewProfile?.id || !session?.user?.id || actionLoading) return;
+    
+    setActionLoading(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const token = authSession?.access_token;
+      
+      if (!token) {
+        showToast('Not authenticated');
+        setActionLoading(false);
+        return;
+      }
+      
+      if (isBlocked) {
+        const res = await fetch('/api/block', {
+          method: 'DELETE',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ blocked_user_id: viewProfile.id }),
+        });
+        if (res.ok) {
+          setIsBlocked(false);
+          useChatStore.getState().removeBlockedId(viewProfile.id);
+          showToast('User unblocked');
+        }
+      } else {
+        const res = await fetch('/api/block', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ blocked_user_id: viewProfile.id }),
+        });
+        if (res.ok) {
+          setIsBlocked(true);
+          useChatStore.getState().addBlockedId(viewProfile.id);
+          showToast('User blocked');
+        }
+      }
+    } catch (err) {
+      console.error('Block error:', err);
+    }
+    setActionLoading(false);
+    setShowMenu(false);
+  };
+
+  const handleReport = async () => {
+    if (!selectedReason || !viewProfile?.id || actionLoading) return;
+    
+    setActionLoading(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const token = authSession?.access_token;
+      
+      if (!token) {
+        showToast('Not authenticated');
+        setActionLoading(false);
+        return;
+      }
+      
+      const res = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reported_id: viewProfile.id,
+          reason: selectedReason,
+        }),
+      });
+      if (res.ok) {
+        showToast('Report submitted');
+        setShowReportModal(false);
+      }
+    } catch (err) {
+      console.error('Report error:', err);
+    }
+    setActionLoading(false);
+  };
 
   useEffect(() => {
     if (!viewProfile?.id) return;
@@ -189,6 +304,36 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
             >
               <X size={14} />
             </button>
+
+            {session?.user?.id && session.user.id !== viewProfile.id && (
+              <div className="absolute top-2 right-10">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-1.5 bg-black/50 hover:bg-black/70 rounded-lg text-white/80 hover:text-white transition-all"
+                >
+                  <MoreVertical size={14} />
+                </button>
+                {showMenu && (
+                  <div className="absolute right-0 mt-1 w-36 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden z-10">
+                    <button
+                      onClick={() => { setShowReportModal(true); setShowMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                      <ShieldAlert size={12} className="text-red-400" />
+                      Report User
+                    </button>
+                    <button
+                      onClick={handleBlock}
+                      disabled={actionLoading}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                    >
+                      <Ban size={12} className={isBlocked ? "text-green-400" : "text-amber-400"} />
+                      {isBlocked ? 'Unblock User' : 'Block User'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="absolute -bottom-8 left-4">
               <AvatarWithEffect 
@@ -306,6 +451,65 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
           </div>
         </div>
       </div>
+
+      {showReportModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[210] flex items-center justify-center p-4"
+          onClick={(e) => e.target === e.currentTarget && setShowReportModal(false)}
+        >
+          <div className="w-full max-w-[280px] bg-zinc-900/95 border border-white/10 rounded-xl p-4">
+            <h3 className="text-sm font-bold text-white mb-3">Report User</h3>
+            <div className="space-y-2 mb-4">
+              {[
+                { id: 'harassment', label: 'Harassment', desc: 'Bullying or threatening behavior' },
+                { id: 'hate_speech', label: 'Hate Speech', desc: 'Content promoting hatred' },
+                { id: 'spam', label: 'Spam', desc: 'Unsolicited advertising' },
+                { id: 'inappropriate', label: 'Inappropriate', desc: 'Offensive or inappropriate content' },
+                { id: 'other', label: 'Other', desc: 'Other violation' },
+              ].map((reason) => (
+                <button
+                  key={reason.id}
+                  onClick={() => setSelectedReason(reason.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg border transition-all ${
+                    selectedReason === reason.id 
+                      ? 'border-red-500/50 bg-red-500/10' 
+                      : 'border-white/5 bg-zinc-800/50 hover:bg-zinc-800'
+                  }`}
+                >
+                  <span className="text-xs font-medium text-white">{reason.label}</span>
+                  <span className="block text-[9px] text-zinc-500">{reason.desc}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowReportModal(false); setSelectedReason(''); }}
+                className="flex-1 px-3 py-2 text-xs text-zinc-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReport}
+                disabled={!selectedReason || actionLoading}
+                className="flex-1 px-3 py-2 text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
+              >
+                {actionLoading ? 'Sending...' : 'Submit Report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-zinc-800 border border-white/10 rounded-lg shadow-xl z-[220] animate-fade-in">
+          <span className="text-xs text-white flex items-center gap-2">
+            {toast.includes('blocked') && <Ban size={12} className={isBlocked ? "text-green-400" : "text-amber-400"} />}
+            {toast.includes('unblocked') && <Check size={12} className="text-green-400" />}
+            {toast.includes('Report') && <ShieldAlert size={12} className="text-red-400" />}
+            {toast}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

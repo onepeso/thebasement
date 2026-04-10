@@ -1,9 +1,10 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { Pencil, Trash2, Smile, Pin, PinOff, Reply } from "lucide-react";
+import { Pencil, Trash2, Smile, Pin, PinOff, Reply, ShieldAlert } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 import { getUsernameStyle, getTextColor } from "@/utils/fontStyles";
+import { useAuthToken } from "@/hooks/useAuthToken";
 
 function MessageItemInner({
   msg,
@@ -26,6 +27,72 @@ function MessageItemInner({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
   const [localText, setLocalText] = useState(msg.text);
+  const [showMessageMenu, setShowMessageMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState("");
+  const [reporting, setReporting] = useState(false);
+  const holdTimer = useRef<NodeJS.Timeout | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { token } = useAuthToken();
+  const blockedIds = useChatStore((state) => state.blockedIds);
+
+  const viewProfile = (profile: any) => {
+    if (profile && !blockedIds.includes(profile.id)) {
+      useChatStore.getState().setViewProfile(profile);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMessageMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleMouseDown = () => {
+    holdTimer.current = setTimeout(() => {
+      setShowMessageMenu(true);
+    }, 500);
+  };
+
+  const handleMouseUp = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  const handleReport = async () => {
+    if (!selectedReason || reporting || !token) return;
+    setReporting(true);
+    try {
+      const res = await fetch("/api/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reported_id: msg.user_id,
+          reason: selectedReason,
+          content_snapshot: msg.text,
+          message_id: msg.id,
+          channel_id: msg.channel_id,
+        }),
+      });
+      if (res.ok) {
+        setShowReportModal(false);
+        setShowMessageMenu(false);
+        setSelectedReason("");
+      }
+    } catch (err) {
+      console.error("Report error:", err);
+    }
+    setReporting(false);
+  };
   
   useEffect(() => {
     setLocalText(msg.text);
@@ -110,6 +177,7 @@ function MessageItemInner({
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
+    const filteredProfiles = allProfiles.filter((p: any) => !blockedIds.includes(p.id));
 
     while ((match = mentionRegex.exec(text)) !== null) {
       if (match.index > lastIndex) {
@@ -117,15 +185,15 @@ function MessageItemInner({
       }
       
       const username = match[1];
-      const mentionedProfile = allProfiles.find((p: any) => p.username?.toLowerCase() === username.toLowerCase());
+      const mentionedProfile = filteredProfiles.find((p: any) => p.username?.toLowerCase() === username.toLowerCase());
       
-      if (mentionedProfile) {
+      if (mentionedProfile && !blockedIds.includes(mentionedProfile.id)) {
         parts.push(
           <button
             key={match.index}
             onClick={(e) => {
               e.stopPropagation();
-              useChatStore.getState().setViewProfile(mentionedProfile);
+              viewProfile(mentionedProfile);
             }}
             className="text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer"
             style={{
@@ -171,6 +239,11 @@ function MessageItemInner({
             ? `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} bg-gradient-to-r from-indigo-500/[0.03] to-transparent`
             : `px-6 ${isGrouped ? "py-0.5" : "py-3 mt-1"} hover:bg-white/[0.02]`
         }`}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleMouseDown}
+        onTouchEnd={handleMouseUp}
       >
         <div className="shrink-0 flex justify-center mr-4 w-10">
           {!isGrouped ? (
@@ -178,7 +251,7 @@ function MessageItemInner({
               profile={msg.profiles}
               size="lg"
               showStatus={false}
-              onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
+              onClick={() => viewProfile(msg.profiles)}
             />
           ) : (
             <div className="w-10" />
@@ -195,7 +268,7 @@ function MessageItemInner({
                       color: getTextColor(msg.profiles?.text_color),
                     }}
                     title={formatFullDate(msg.created_at)}
-                    onClick={() => msg.profiles && useChatStore.getState().setViewProfile(msg.profiles)}
+                    onClick={() => viewProfile(msg.profiles)}
                   >
                     {msg.profiles?.username}
                   </span>
@@ -326,9 +399,76 @@ function MessageItemInner({
                 {formatTime(msg.created_at)}
               </span>
             </div>
+
+            {showMessageMenu && (
+              <div 
+                ref={menuRef}
+                className="absolute left-1/2 top-full mt-1 z-50 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[140px]"
+              >
+                {!isMe && (
+                  <button
+                    onClick={() => { setShowReportModal(true); setShowMessageMenu(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                  >
+                    <ShieldAlert size={12} className="text-red-400" />
+                    Report Message
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {showReportModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[210] flex items-center justify-center p-4"
+          onClick={() => setShowReportModal(false)}
+        >
+          <div 
+            className="w-full max-w-[280px] bg-zinc-900/95 border border-white/10 rounded-xl p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-white mb-3">Report Message</h3>
+            <div className="space-y-2 mb-4">
+              {[
+                { id: "harassment", label: "Harassment" },
+                { id: "hate_speech", label: "Hate Speech" },
+                { id: "spam", label: "Spam" },
+                { id: "inappropriate", label: "Inappropriate" },
+                { id: "other", label: "Other" },
+              ].map((reason) => (
+                <button
+                  key={reason.id}
+                  onClick={() => setSelectedReason(reason.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg border transition-all ${
+                    selectedReason === reason.id 
+                      ? "border-red-500/50 bg-red-500/10" 
+                      : "border-white/5 bg-zinc-800/50 hover:bg-zinc-800"
+                  }`}
+                >
+                  <span className="text-xs font-medium text-white">{reason.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowReportModal(false); setSelectedReason(""); }}
+                className="flex-1 px-3 py-2 text-xs text-zinc-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReport}
+                disabled={!selectedReason || reporting}
+                className="flex-1 px-3 py-2 text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
+              >
+                {reporting ? "Sending..." : "Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

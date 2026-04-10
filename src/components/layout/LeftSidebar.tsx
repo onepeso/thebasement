@@ -32,10 +32,12 @@ const STATUS_CONFIG: Record<UserStatus, { dot: string; label: string; text: stri
 
 export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile, activeChannel, isMobile, onClose, onCreateChannel, onEditChannel, onInvite, onViewMembers, onDiscover, memberCounts }: LeftSidebarProps) {
   const { channels, setActiveChannel } = useChatStore();
+  const blockedIds = useChatStore((state) => state.blockedIds);
   
-  const allOnlineUsers = myProfile?.id && onlineUsers 
-    ? [...new Set([myProfile.id, ...onlineUsers])] 
-    : onlineUsers || [];
+  const filteredOnlineUsers = onlineUsers?.filter(id => !blockedIds.includes(id)) || [];
+  const allOnlineUsers = myProfile?.id && filteredOnlineUsers 
+    ? [...new Set([myProfile.id, ...filteredOnlineUsers])] 
+    : filteredOnlineUsers;
   const isOnline = myProfile?.id ? allOnlineUsers.includes(myProfile.id) : false;
   const userStatus = (myProfile?.status || 'online') as UserStatus;
   const statusConfig = STATUS_CONFIG[userStatus];

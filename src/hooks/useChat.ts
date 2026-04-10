@@ -14,8 +14,52 @@ export function useChat(channelId: string | undefined, userId: string | undefine
     const messageCache = useChatStore((state) => state.messageCache);
     const setMessageCache = useChatStore((state) => state.setMessageCache);
     const lastReadTimestamps = useChatStore((state) => state.lastReadTimestamps);
+    const blockedIds = useChatStore((state) => state.blockedIds);
+    const setBlockedIds = useChatStore((state) => state.setBlockedIds);
+    const addBlockedId = useChatStore((state) => state.addBlockedId);
+    const removeBlockedId = useChatStore((state) => state.removeBlockedId);
     
+    const blockedIdsRef = useRef<string[]>([]);
     const fetchingRef = useRef(false);
+    const [blockedLoaded, setBlockedLoaded] = useState(false);
+    
+    useEffect(() => {
+        blockedIdsRef.current = blockedIds;
+    }, [blockedIds]);
+    
+    useEffect(() => {
+        const fetchBlockedUsers = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user?.id) {
+                setBlockedLoaded(true);
+                return;
+            }
+            
+            const { data } = await supabase
+                .from('blocked_users')
+                .select('blocked_user_id')
+                .eq('user_id', session.user.id);
+            
+            if (data) {
+                const ids = data.map(b => b.blocked_user_id);
+                setBlockedIds(ids);
+                blockedIdsRef.current = ids;
+            }
+            setBlockedLoaded(true);
+        };
+        
+        fetchBlockedUsers();
+    }, [setBlockedIds]);
+    
+    useEffect(() => {
+        if (blockedLoaded && channelId && messages.length > 0 && blockedIds.length > 0) {
+            const filteredMessages = messages.filter(m => !blockedIds.includes(m.user_id));
+            if (filteredMessages.length !== messages.length) {
+                setMessages(filteredMessages);
+            }
+        }
+    }, [blockedIds, blockedLoaded, channelId, messages]);
+
     const channelIdRef = useRef(channelId);
     const isSubscribedRef = useRef(false);
     const initialFetchDoneRef = useRef(false);
@@ -30,7 +74,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
         setError(null);
 
         try {
-            if (!skipCache) {
+            if (!skipCache && blockedIds.length === 0) {
                 const cached = messageCache[channelId];
                 if (cached && cached.messages.length > 0) {
                     setMessages(cached.messages);
@@ -41,12 +85,18 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 }
             }
 
-            const { data: msgData, error: msgError } = await supabase
+            let msgQuery = supabase
                 .from('messages')
                 .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                 .eq('channel_id', channelId)
                 .order('created_at', { ascending: true })
                 .limit(MESSAGE_LIMIT);
+            
+            if (blockedIds.length > 0) {
+                msgQuery = msgQuery.not('user_id', 'in', `(${blockedIds.join(',')})`);
+            }
+            
+            const { data: msgData, error: msgError } = await msgQuery;
 
             if (channelId !== channelIdRef.current) {
                 fetchingRef.current = false;
@@ -145,6 +195,7 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                     const newMsg = JSON.parse(JSON.stringify(payload.new)) as any; 
                     
                     if (newMsg.is_optimistic) return;
+                    if (blockedIds.includes(newMsg.user_id)) return;
                     
                     if (newMsg.user_id === userId) {
                         const optimisticMsg = Array.from(optimisticMessagesRef.current).find(id => {
@@ -230,13 +281,19 @@ export function useChat(channelId: string | undefined, userId: string | undefine
                 return;
             }
 
-            const { data: msgData } = await supabase
+            let moreQuery = supabase
                 .from('messages')
                 .select('*, profiles:user_id(id, username, avatar_url, bio, status, avatar_effect, avatar_overlays, font_style, text_color)')
                 .eq('channel_id', channelId)
                 .lt('created_at', oldestMsg.created_at)
                 .order('created_at', { ascending: true })
                 .limit(MESSAGE_LIMIT);
+            
+            if (blockedIds.length > 0) {
+                moreQuery = moreQuery.not('user_id', 'in', `(${blockedIds.join(',')})`);
+            }
+            
+            const { data: msgData } = await moreQuery;
 
             if (msgData && msgData.length > 0) {
                 const replyMsgIds = msgData
