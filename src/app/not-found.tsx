@@ -1,9 +1,17 @@
 export default function NotFound() {
   return (
-    <div className="flex items-center justify-center h-screen bg-zinc-950 text-white">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold text-zinc-800">404</h1>
-        <p className="text-zinc-500 mt-2">Page not found</p>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      backgroundColor: '#09090b',
+      color: 'white',
+      fontFamily: 'system-ui, sans-serif'
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={{ fontSize: '6rem', fontWeight: 'bold', color: '#27272a' }}>404</h1>
+        <p style={{ color: '#71717a', marginTop: '0.5rem' }}>Page not found</p>
       </div>
     </div>
   );
