@@ -9,10 +9,13 @@ jobs:
     permissions:
       contents: write
     runs-on: ${{ matrix.platform }}
+    # Defining env here makes these variables available to ALL steps in this job
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
     strategy:
       fail-fast: false
       matrix:
-        # Note: Using ubuntu-22.04 is fine, but ensure your Tauri config targets these versions
         platform: [macos-latest, ubuntu-22.04, windows-latest]
 
     steps:
@@ -33,7 +36,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       # 4. Install System Dependencies (Ubuntu only)
-      # UPDATED: Added webkit2gtk-4.1, javascriptcoregtk-4.1, and libsoup-3.0 for Tauri v2
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -58,8 +60,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         with:
           tagName: v__VERSION__
           releaseName: "App v__VERSION__"
