@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot report yourself' }, { status: 400 });
     }
 
-    const validReasons = ['spam', 'harassment', 'hate_speech', 'inappropriate', 'other'];
+    const validReasons = ['spam', 'harassment', 'hate_speech', 'inappropriate', 'csam', 'other'];
     if (!validReasons.includes(reason)) {
       return NextResponse.json({ error: 'Invalid reason' }, { status: 400 });
     }

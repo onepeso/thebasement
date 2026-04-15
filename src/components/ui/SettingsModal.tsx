@@ -4,6 +4,8 @@ import { useChatStore } from '@/store/useChatStore';
 import { useToast } from '@/store/useToastStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpdate } from '@/hooks/useUpdate';
+import { useIsMobile } from '@/hooks/useMediaQuery';
+import { MobileSettingsModal } from './MobileSettingsModal';
 import { User, Palette, Save, X, Circle, Bell, AtSign, MessageCircle, Volume2, VolumeX, UserCog, BellRing, RefreshCw, Download, Info, Trophy, Zap, Star, Type, Trash2, AlertTriangle, Check, Loader2, ChevronRight, Shield, Ban, UserX } from 'lucide-react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { getVersion } from '@tauri-apps/api/app';
@@ -172,6 +174,7 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
   const toast = useToast();
   const { session, updateProfile } = useAuth();
   const { update: updateInfo, isChecking, isDownloading, downloadProgress, checkForUpdates, downloadAndInstall } = useUpdate();
+  const isMobile = useIsMobile();
   
   const [activeTab, setActiveTab] = useState('profile');
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
@@ -421,6 +424,10 @@ export function SettingsModal({ myProfile, challenges = [], totalXP = 0, badges 
     if (xp >= 50) return 2;
     return 1;
   };
+
+  if (isMobile) {
+    return <MobileSettingsModal onClose={() => setShowSettings(false)} />;
+  }
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-fade-in" onClick={(e) => e.target === e.currentTarget && setShowSettings(false)}>

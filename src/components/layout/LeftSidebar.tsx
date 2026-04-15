@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useChatStore } from "@/store/useChatStore";
-import { LogOut, Hash, Settings, X, Plus, Shield, Pencil, UserPlus, Users, Globe } from "lucide-react";
+import { LogOut, Hash, Settings, X, Plus, Shield, Pencil, UserPlus, Users, Globe, MoreHorizontal } from "lucide-react";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 import { cleanupPresence } from "@/hooks/usePresence";
 import type { UserStatus } from "@/types/database";
@@ -33,6 +33,7 @@ const STATUS_CONFIG: Record<UserStatus, { dot: string; label: string; text: stri
 export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile, activeChannel, isMobile, onClose, onCreateChannel, onEditChannel, onInvite, onViewMembers, onDiscover, memberCounts }: LeftSidebarProps) {
   const { channels, setActiveChannel } = useChatStore();
   const blockedIds = useChatStore((state) => state.blockedIds);
+  const [mobileChannelMenu, setMobileChannelMenu] = useState<any>(null);
   
   const filteredOnlineUsers = onlineUsers?.filter(id => !blockedIds.includes(id)) || [];
   const allOnlineUsers = myProfile?.id && filteredOnlineUsers 
@@ -94,51 +95,64 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
       <div
         key={chan.id}
         onClick={() => handleChannelClick(chan)}
-        className={`group flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] cursor-pointer transition-all ${
+        className={`group flex items-center gap-2 px-3 sm:px-2 py-3 sm:py-1.5 rounded-lg sm:rounded-md text-sm sm:text-[13px] cursor-pointer transition-all active:scale-[0.98] ${
           isActive
             ? "bg-indigo-500/20 text-indigo-300 font-medium"
-            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+            : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5 active:bg-white/10"
         }`}
       >
         {hasEmoji ? (
-          <span className="shrink-0 text-sm">{emoji}</span>
+          <span className="shrink-0 text-base sm:text-sm">{emoji}</span>
         ) : (
-          <Hash size={13} className={`shrink-0 ${isActive ? "text-indigo-400" : "text-zinc-700"}`} />
+          <Hash size={14} className={`shrink-0 ${isActive ? "text-indigo-400" : "text-zinc-700"}`} />
         )}
         <span className="truncate">{chan.name}</span>
         {isOfficial && (
-          <Shield size={9} className={`shrink-0 ${isActive ? "text-indigo-400" : "text-indigo-500/60"}`} />
+          <Shield size={10} className={`shrink-0 ${isActive ? "text-indigo-400" : "text-indigo-500/60"}`} />
         )}
-        <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        
+        {/* Desktop: Show action icons on hover */}
+        <div className="hidden sm:flex ml-auto items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {canInvite && (
             <button
               onClick={(e) => handleInviteClick(e, chan)}
-              className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-95"
               title="Invite"
             >
-              <UserPlus size={11} />
+              <UserPlus size={12} />
             </button>
           )}
           <button
             onClick={(e) => handleViewMembersClick(e, chan)}
-            className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] text-zinc-600 hover:text-zinc-400 hover:bg-white/10 transition-all cursor-pointer"
+            className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] text-zinc-600 hover:text-zinc-400 hover:bg-white/10 transition-all cursor-pointer active:scale-95"
             title="Members"
           >
-            <Users size={9} />
-            {memberCounts?.[chan.id] ?? 0}
+            <Users size={10} />
+            <span>{memberCounts?.[chan.id] ?? 0}</span>
           </button>
           {canEdit && (
             <button
               onClick={(e) => handleEditClick(e, chan)}
-              className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-95"
               title="Edit"
             >
-              <Pencil size={11} />
+              <Pencil size={12} />
             </button>
           )}
         </div>
+        
+        {/* Mobile: Show "More" button */}
+        {isMobile && (canEdit || canInvite) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setMobileChannelMenu(chan); }}
+            className="ml-auto p-2 -mr-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        )}
+        
         {!isActive && (unreadCounts[chan.id] || 0) > 0 && (
-          <span className="ml-auto px-1.5 py-0.5 text-[9px] font-bold bg-indigo-500 text-white rounded-full min-w-[16px] text-center">
+          <span className="ml-auto px-2 py-0.5 sm:px-1.5 sm:py-0.5 text-[10px] sm:text-[9px] font-bold bg-indigo-500 text-white rounded-full min-w-[20px] sm:min-w-[16px] text-center">
             {unreadCounts[chan.id] > 99 ? '99+' : unreadCounts[chan.id]}
           </span>
         )}
@@ -147,18 +161,18 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
   };
 
   return (
-    <div className={`w-64 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 border-r border-white/5 flex flex-col h-full ${isMobile ? 'absolute inset-0' : ''}`}>
+    <div className={`w-full sm:w-64 bg-zinc-900 border-r border-white/5 flex flex-col h-full ${isMobile ? 'absolute inset-0 z-50' : ''}`}>
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5 pointer-events-none" />
       
       {/* Mobile Header */}
       {isMobile && (
-        <div className="h-14 flex items-center justify-between px-4 border-b border-white/5 shrink-0">
-          <span className="text-sm font-bold text-zinc-200">Menu</span>
+        <div className="h-16 flex items-center justify-between px-5 border-b border-white/5 shrink-0 bg-zinc-900/95">
+          <span className="text-lg font-bold text-zinc-200">Menu</span>
           <button 
             onClick={onClose}
-            className="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-white"
+            className="w-12 h-12 flex items-center justify-center hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white active:scale-95 transition-all"
           >
-            <X size={18} />
+            <X size={24} />
           </button>
         </div>
       )}
@@ -171,14 +185,14 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
       </div>
 
       {/* Channels - Middle Section */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+      <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 pb-safe">
         {/* Official Channels */}
         {userChannels.length > 0 && (
-          <div className="px-3 pt-4">
-            <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
-              <Shield size={9} /> Official
+          <div className="px-4 sm:px-3 pt-6 sm:pt-4">
+            <span className="text-[10px] sm:text-[10px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+              <Shield size={10} /> Official
             </span>
-            <div className="mt-1 space-y-0.5">
+            <div className="mt-2 sm:mt-1 space-y-1 sm:space-y-0.5">
               {userChannels.map((chan: any) => renderChannelItem(chan, true))}
             </div>
           </div>
@@ -186,12 +200,12 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
         
         {/* User's Channels */}
         {myChannels.length > 0 && (
-          <div className="px-3 pt-4">
+          <div className="px-4 sm:px-3 pt-6 sm:pt-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+              <span className="text-[10px] sm:text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 My Channels
               </span>
-              <span className="text-[9px] text-zinc-600">{myChannels.length}/3</span>
+              <span className="text-[10px] sm:text-[9px] text-zinc-600">{myChannels.length}/3</span>
             </div>
             <div className="mt-1 space-y-0.5">
               {myChannels.map((chan: any) => renderChannelItem(chan, false, false, true))}
@@ -279,6 +293,67 @@ export function LeftSidebar({ myProfile, allProfiles, onlineUsers, onOpenProfile
           </div>
         </div>
       </div>
+
+      {/* Mobile Channel Actions Menu */}
+      {mobileChannelMenu && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:hidden"
+          onClick={() => setMobileChannelMenu(null)}
+        >
+          <div 
+            className="w-full bg-zinc-900/95 border-t border-white/10 rounded-t-2xl p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                {mobileChannelMenu.emoji && mobileChannelMenu.emoji !== '💬' ? (
+                  <span className="text-xl">{mobileChannelMenu.emoji}</span>
+                ) : (
+                  <Hash size={20} className="text-indigo-400" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">{mobileChannelMenu.name}</h3>
+                <p className="text-xs text-zinc-500">{memberCounts?.[mobileChannelMenu.id] ?? 0} members</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {canEditChannel(mobileChannelMenu) && (
+                <button
+                  onClick={() => { onEditChannel?.(mobileChannelMenu); setMobileChannelMenu(null); }}
+                  className="w-full flex items-center gap-3 px-4 py-4 text-sm text-white bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                >
+                  <Pencil size={18} className="text-zinc-400" />
+                  Edit Channel
+                </button>
+              )}
+              {mobileChannelMenu.created_by === myProfile?.id && (
+                <button
+                  onClick={() => { onInvite?.(mobileChannelMenu); setMobileChannelMenu(null); }}
+                  className="w-full flex items-center gap-3 px-4 py-4 text-sm text-white bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                >
+                  <UserPlus size={18} className="text-zinc-400" />
+                  Invite Members
+                </button>
+              )}
+              <button
+                onClick={() => { onViewMembers?.(mobileChannelMenu); setMobileChannelMenu(null); }}
+                className="w-full flex items-center gap-3 px-4 py-4 text-sm text-white bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+              >
+                <Users size={18} className="text-zinc-400" />
+                View Members
+              </button>
+              <button
+                onClick={() => setMobileChannelMenu(null)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm text-zinc-500 mt-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

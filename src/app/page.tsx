@@ -92,6 +92,9 @@ export default function Home() {
   const hasLoadedNotifications = useRef(false);
   const seenNotificationIds = useRef<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const pullStartY = useRef(0);
 
   const onlineUsers = usePresence(session?.user?.id);
   const { messages, hasMore, loading, loadingMore, loadMore, deleteMessage, addOptimisticMessage } = useChat(activeChannel?.id, session?.user?.id);
@@ -370,6 +373,32 @@ export default function Home() {
     setShowScrollButton(distanceToBottom > 400);
   };
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
+      pullStartY.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - pullStartY.current;
+      if (diff > 0) {
+        setPullDistance(Math.min(diff, 80));
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullDistance > 50) {
+      setIsPulling(true);
+      await performRefresh();
+    }
+    setPullDistance(0);
+    setIsPulling(false);
+  };
+
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
@@ -531,16 +560,16 @@ export default function Home() {
         <main className="flex-1 flex flex-col bg-zinc-900/30 min-w-0 relative">
           {/* Channel Header */}
           <header 
-            className="h-14 lg:h-16 flex items-center justify-between px-4 lg:px-6 shrink-0 z-20 border-b border-white/5 bg-zinc-900/80 backdrop-blur-none lg:backdrop-blur-xl"
+            className="h-14 lg:h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 shrink-0 z-20 border-b border-white/5 bg-zinc-900/95 backdrop-blur-md"
             style={{ borderTopWidth: 3, borderTopColor: (activeChannel as any)?.accent_color || '#ffffff' }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setShowMobileSidebar(true)}
-                className="lg:hidden p-2 -ml-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5"
+                className="lg:hidden w-12 h-12 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 touch-manipulation"
               >
-                <Menu size={20} />
+                <Menu size={22} />
               </button>
               {(() => {
                 const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
@@ -562,7 +591,7 @@ export default function Home() {
                 const accentColor = (activeChannel as any)?.accent_color || '#ffffff';
                 return (
                   <div 
-                    className="w-8 lg:w-10 h-8 lg:h-10 rounded-xl flex items-center justify-center relative"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center relative shrink-0"
                     style={{ background: `linear-gradient(135deg, ${color.from}, ${color.to})` }}
                   >
                     <div 
@@ -571,16 +600,16 @@ export default function Home() {
                     />
                     <div className="relative">
                       {hasEmoji ? (
-                        <span className="text-lg">{emoji}</span>
+                        <span className="text-base">{emoji}</span>
                       ) : (
-                        <Hash size={16} className="lg:text-lg text-white/80" />
+                        <Hash size={14} className="text-white/80" />
                       )}
                     </div>
                   </div>
                 );
               })()}
               <div className="min-w-0">
-                <h1 className="text-sm lg:text-base font-bold text-white tracking-tight truncate">
+                <h1 className="text-sm font-bold text-white tracking-tight truncate">
                   {activeChannel?.name || "loading"}
                 </h1>
                 {activeChannel?.description ? (
@@ -598,7 +627,7 @@ export default function Home() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowNotifications(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all relative"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-all relative touch-manipulation"
                   title="Notifications"
                 >
                   <Bell size={16} />
@@ -610,45 +639,45 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => setShowPinnedMessages(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all relative"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-all relative touch-manipulation"
                   title="Pinned Messages"
                 >
                   <Pin size={16} />
                 </button>
                 <button
                   onClick={() => setShowSearch(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation"
                   title="Search (Ctrl+K)"
                 >
                   <Search size={16} />
                 </button>
                 <button
                   onClick={() => setShowChallenges(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all relative"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-all relative touch-manipulation"
                   title="Challenges"
                 >
                   <Trophy size={16} />
                   {completedCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center">
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-amber-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center">
                       {completedCount}
                     </span>
                   )}
                 </button>
-              <div className="w-px h-4 bg-white/10 mx-1" />
+              <div className="w-px h-6 bg-white/10 mx-1" />
               <button
                 onClick={async () => {
                   setIsRefreshing(true);
                   await performRefresh();
                   setIsRefreshing(false);
                 }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation"
                 title="Refresh"
               >
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation"
                 title="Settings"
               >
                 <Settings size={16} />
@@ -683,8 +712,20 @@ export default function Home() {
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar overscroll-none"
           >
+            {/* Pull to refresh indicator */}
+            {(isPulling || pullDistance > 0) && (
+              <div className="sticky top-0 z-10 flex justify-center py-2 bg-gradient-to-b from-zinc-900 to-transparent">
+                <div className="flex flex-col items-center gap-1">
+                  <div className={`w-5 h-5 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin ${isPulling ? 'opacity-100' : 'opacity-50'}`} />
+                  <span className="text-[10px] text-zinc-500">{isPulling ? 'Refreshing...' : 'Pull down to refresh'}</span>
+                </div>
+              </div>
+            )}
             {loading ? (
               <div className="h-full flex flex-col items-center justify-center gap-4">
                 <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />

@@ -100,6 +100,7 @@ export function AdminReportsDashboard({ onClose }: AdminReportsDashboardProps) {
     hate_speech: 'Hate Speech',
     spam: 'Spam',
     inappropriate: 'Inappropriate',
+    csam: 'Child Safety (CSAM)',
     other: 'Other',
   };
 

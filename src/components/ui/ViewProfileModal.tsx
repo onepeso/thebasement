@@ -112,6 +112,7 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string>('');
+  const [customReason, setCustomReason] = useState<string>('');
   const [isBlocked, setIsBlocked] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -213,11 +214,14 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
         body: JSON.stringify({
           reported_id: viewProfile.id,
           reason: selectedReason,
+          content_snapshot: selectedReason === 'other' ? customReason : undefined,
         }),
       });
       if (res.ok) {
         showToast('Report submitted');
         setShowReportModal(false);
+        setSelectedReason('');
+        setCustomReason('');
       }
     } catch (err) {
       console.error('Report error:', err);
@@ -465,6 +469,7 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
                 { id: 'hate_speech', label: 'Hate Speech', desc: 'Content promoting hatred' },
                 { id: 'spam', label: 'Spam', desc: 'Unsolicited advertising' },
                 { id: 'inappropriate', label: 'Inappropriate', desc: 'Offensive or inappropriate content' },
+                { id: 'csam', label: 'Child Safety (CSAM)', desc: 'Child sexual abuse material', isDanger: true },
                 { id: 'other', label: 'Other', desc: 'Other violation' },
               ].map((reason) => (
                 <button
@@ -476,21 +481,31 @@ export function ViewProfileModal({ onlineUsers }: ViewProfileModalProps) {
                       : 'border-white/5 bg-zinc-800/50 hover:bg-zinc-800'
                   }`}
                 >
-                  <span className="text-xs font-medium text-white">{reason.label}</span>
+                  <span className={`text-xs font-medium ${reason.isDanger ? 'text-red-400' : 'text-white'}`}>{reason.label}</span>
                   <span className="block text-[9px] text-zinc-500">{reason.desc}</span>
                 </button>
               ))}
+              {selectedReason === 'other' && (
+                <input
+                  type="text"
+                  placeholder="Explain your report..."
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-zinc-800 border border-white/10 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/50"
+                  autoFocus
+                />
+              )}
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => { setShowReportModal(false); setSelectedReason(''); }}
+                onClick={() => { setShowReportModal(false); setSelectedReason(''); setCustomReason(''); }}
                 className="flex-1 px-3 py-2 text-xs text-zinc-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReport}
-                disabled={!selectedReason || actionLoading}
+                disabled={!selectedReason || (selectedReason === 'other' && !customReason.trim()) || actionLoading}
                 className="flex-1 px-3 py-2 text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
               >
                 {actionLoading ? 'Sending...' : 'Submit Report'}

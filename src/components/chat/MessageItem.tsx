@@ -1,6 +1,6 @@
 import { memo, useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { Pencil, Trash2, Smile, Pin, PinOff, Reply, ShieldAlert } from "lucide-react";
+import { Pencil, Trash2, Smile, Pin, PinOff, Reply, ShieldAlert, MoreHorizontal } from "lucide-react";
 import { useChatStore } from "@/store/useChatStore";
 import { AvatarWithEffect } from "@/components/ui/AvatarWithEffect";
 import { getUsernameStyle, getTextColor } from "@/utils/fontStyles";
@@ -30,6 +30,7 @@ function MessageItemInner({
   const [showMessageMenu, setShowMessageMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
   const [reporting, setReporting] = useState(false);
   const holdTimer = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -87,6 +88,7 @@ function MessageItemInner({
         setShowReportModal(false);
         setShowMessageMenu(false);
         setSelectedReason("");
+        setCustomReason("");
       }
     } catch (err) {
       console.error("Report error:", err);
@@ -344,7 +346,7 @@ function MessageItemInner({
             </div>
 
             {!isEditing && (
-              <div className="relative flex items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:opacity-0 transition-opacity duration-200 shrink-0">
+              <div className="relative flex items-center gap-0.5 ml-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 shrink-0 hidden sm:flex">
                 <button
                   onClick={() => onReactionClick && onReactionClick(msg)}
                   className="p-1 rounded text-zinc-500 hover:text-yellow-400 hover:bg-white/5 transition-all cursor-pointer"
@@ -370,6 +372,15 @@ function MessageItemInner({
                 >
                   {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
                 </button>
+                {!isMe && (
+                  <button
+                    onClick={() => { setShowReportModal(true); }}
+                    className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-white/5 transition-all cursor-pointer"
+                    title="Report"
+                  >
+                    <ShieldAlert size={12} />
+                  </button>
+                )}
                 {isMe && (
                   <>
                     <button
@@ -400,68 +411,149 @@ function MessageItemInner({
               </span>
             </div>
 
-            {showMessageMenu && (
-              <div 
-                ref={menuRef}
-                className="absolute left-1/2 top-full mt-1 z-50 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden min-w-[140px]"
+            {/* Mobile long-press indicator - show on touch devices */}
+            <div className="sm:hidden flex items-center gap-0.5 ml-2 opacity-50">
+              <button
+                onClick={() => setShowMessageMenu(true)}
+                className="p-2 -m-2 text-zinc-600 active:text-white"
+                title="More options"
               >
-                {!isMe && (
-                  <button
-                    onClick={() => { setShowReportModal(true); setShowMessageMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-                  >
-                    <ShieldAlert size={12} className="text-red-400" />
-                    Report Message
-                  </button>
-                )}
-              </div>
-            )}
+                <MoreHorizontal size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Mobile message actions - bottom sheet */}
+      {showMessageMenu && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:hidden"
+          onClick={() => setShowMessageMenu(false)}
+        >
+          <div 
+            className="w-full bg-zinc-900/95 border-t border-white/10 rounded-t-2xl p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+            <div className="space-y-2">
+              {!isMe && (
+                <button
+                  onClick={() => { setShowReportModal(true); setShowMessageMenu(false); }}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-red-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                >
+                  <ShieldAlert size={18} />
+                  Report Message
+                </button>
+              )}
+              <button
+                onClick={() => { onReply?.(msg); setShowMessageMenu(false); }}
+                className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-indigo-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+              >
+                <Reply size={18} />
+                Reply
+              </button>
+              <button
+                onClick={() => { onReactionClick?.(msg); setShowMessageMenu(false); }}
+                className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-yellow-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+              >
+                <Smile size={18} />
+                React
+              </button>
+              {isPinned ? (
+                <button
+                  onClick={() => { onUnpin?.(msg.id); setShowMessageMenu(false); }}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-zinc-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                >
+                  <PinOff size={18} />
+                  Unpin
+                </button>
+              ) : (
+                <button
+                  onClick={() => { onPin?.(msg.id); setShowMessageMenu(false); }}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-zinc-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                >
+                  <Pin size={18} />
+                  Pin
+                </button>
+              )}
+              {isMe && (
+                <>
+                  <button
+                    onClick={() => { setIsEditing(true); setShowMessageMenu(false); }}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-emerald-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                  >
+                    <Pencil size={18} />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => { onDelete?.(msg.id); setShowMessageMenu(false); }}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm text-red-400 bg-zinc-800/50 rounded-xl active:bg-zinc-800"
+                  >
+                    <Trash2 size={18} />
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showReportModal && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[210] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setShowReportModal(false)}
         >
           <div 
-            className="w-full max-w-[280px] bg-zinc-900/95 border border-white/10 rounded-xl p-4"
+            className="w-full sm:max-w-[320px] bg-zinc-900/95 border border-white/10 rounded-t-2xl sm:rounded-xl p-4 pb-8 sm:pb-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-bold text-white mb-3">Report Message</h3>
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-4 sm:hidden" />
+            <h3 className="text-base sm:text-sm font-bold text-white mb-4">Report Message</h3>
             <div className="space-y-2 mb-4">
               {[
                 { id: "harassment", label: "Harassment" },
                 { id: "hate_speech", label: "Hate Speech" },
                 { id: "spam", label: "Spam" },
                 { id: "inappropriate", label: "Inappropriate" },
+                { id: "csam", label: "Child Safety (CSAM)", isDanger: true },
                 { id: "other", label: "Other" },
               ].map((reason) => (
                 <button
                   key={reason.id}
                   onClick={() => setSelectedReason(reason.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg border transition-all ${
+                  className={`w-full text-left px-4 py-3 sm:px-3 sm:py-2 rounded-xl sm:rounded-lg border transition-all active:scale-[0.98] ${
                     selectedReason === reason.id 
                       ? "border-red-500/50 bg-red-500/10" 
-                      : "border-white/5 bg-zinc-800/50 hover:bg-zinc-800"
+                      : "border-white/5 bg-zinc-800/50 sm:hover:bg-zinc-800"
                   }`}
                 >
-                  <span className="text-xs font-medium text-white">{reason.label}</span>
+                  <span className={`text-sm sm:text-xs font-medium ${reason.isDanger ? 'text-red-400' : 'text-white'}`}>{reason.label}</span>
                 </button>
               ))}
+              {selectedReason === 'other' && (
+                <input
+                  type="text"
+                  placeholder="Explain your report..."
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  className="w-full px-4 py-3 sm:px-3 sm:py-2 text-sm sm:text-xs bg-zinc-800 border border-white/10 rounded-xl sm:rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/50"
+                  autoFocus
+                />
+              )}
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => { setShowReportModal(false); setSelectedReason(""); }}
-                className="flex-1 px-3 py-2 text-xs text-zinc-400 hover:text-white transition-colors"
+                onClick={() => { setShowReportModal(false); setSelectedReason(""); setCustomReason(""); }}
+                className="flex-1 px-4 py-3 sm:px-3 sm:py-2 text-sm sm:text-xs text-zinc-400 hover:text-white transition-colors rounded-xl sm:rounded-lg active:bg-white/5"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReport}
-                disabled={!selectedReason || reporting}
-                className="flex-1 px-3 py-2 text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
+                disabled={!selectedReason || (selectedReason === 'other' && !customReason.trim()) || reporting}
+                className="flex-1 px-4 py-3 sm:px-3 sm:py-2 text-sm sm:text-xs bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-xl sm:rounded-lg transition-colors active:scale-95"
               >
                 {reporting ? "Sending..." : "Submit"}
               </button>

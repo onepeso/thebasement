@@ -102,7 +102,6 @@ interface ChatStore {
   setChannelSequence: (channelId: string, sequence: number) => void;
   setLastEventTimestamp: (timestamp: string) => void;
   
-  // Message cache
   messageCache: Record<string, {
     messages: any[];
     hasMore: boolean;
@@ -143,11 +142,6 @@ interface ChatStore {
   
   setShowUpdatePopup: (show: boolean) => void;
   dismissUpdate: (version: string) => void;
-  
-  blockedIds: string[];
-  setBlockedIds: (ids: string[]) => void;
-  addBlockedId: (id: string) => void;
-  removeBlockedId: (id: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -177,7 +171,6 @@ export const useChatStore = create<ChatStore>()(
       showUpdatePopup: false,
       dismissedUpdateVersion: null,
       showKeyboardShortcuts: false,
-      blockedIds: [],
 
       // Message cache
       messageCache: {},
