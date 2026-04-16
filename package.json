@@ -1,14 +1,12 @@
 {
   "name": "thebasement",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "vitest run && next build && pnpm copy-assets && pnpm prepare-tauri-dist",
-
-"copy-assets": "node -e \"const {existsSync, mkdirSync, cpSync, rmSync} = require('fs'); const out='.next/standalone/.next'; if(!existsSync(out+'/static'))mkdirSync(out+'/static',{recursive:true}); cpSync('public','.next/standalone/public',{recursive:true}); cpSync('.next/static',out+'/static',{recursive:true});\"",
-
-"prepare-tauri-dist": "node -e \"const {writeFileSync, mkdirSync, existsSync} = require('fs'); mkdirSync('dist',{recursive:true}); writeFileSync('dist/index.html','<!DOCTYPE html><html><head><meta http-equiv=\\'refresh\\' content=\\'0;url=http://localhost:3000\\'></head></html>');\"",
+    "copy-assets": "node -e \"const {existsSync, mkdirSync, cpSync, rmSync} = require('fs'); const out='.next/standalone/.next'; if(!existsSync(out+'/static'))mkdirSync(out+'/static',{recursive:true}); cpSync('public','.next/standalone/public',{recursive:true}); cpSync('.next/static',out+'/static',{recursive:true});\"",
+    "prepare-tauri-dist": "node -e \"const {writeFileSync, mkdirSync, existsSync} = require('fs'); mkdirSync('dist',{recursive:true}); writeFileSync('dist/index.html','<!DOCTYPE html><html><head><meta http-equiv=\\'refresh\\' content=\\'0;url=http://localhost:3000\\'></head></html>');\"",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
