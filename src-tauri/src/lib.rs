@@ -7,10 +7,14 @@ use tauri::Manager;
 fn start_next_server() {
     thread::spawn(|| {
         let mut attempts = 0;
+        let base_path = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| std::path::PathBuf::from(".next/standalone"));
         loop {
             attempts += 1;
             let child = Command::new("node")
-                .current_dir(".next/standalone")
+                .current_dir(&base_path)
                 .args(["server.js"])
                 .spawn();
 

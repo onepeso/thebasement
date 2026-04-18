@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Menu, Hash, Search, Users, Bell, Pin, RefreshCw } from "lucide-react";
+import { Menu, Hash, Search, Users, Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useChat } from "@/hooks/useChat";
 import { useChatStore } from "@/store/useChatStore";
+import { useRealtimeChannels } from "@/hooks/useRealtimeChannels";
 import { useMobileNav } from "@/components/mobile/MobileNavContext";
 import { MobileChannelList } from "@/components/mobile/MobileChannelList";
 import { MobileMemberSheet } from "@/components/mobile/MobileMemberSheet";
@@ -52,13 +53,19 @@ export default function MobileChannelsPage() {
   const [invitingChannel, setInvitingChannel] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasRestoredChannel = useRef(false);
 
   const onlineUsers = usePresence(session?.user?.id);
+
+  const { fetchMemberCounts } = useRealtimeChannels({
+    userId: session?.user?.id,
+    onChannelsChange: setChannels,
+    onMemberCountsChange: setMemberCounts,
+  });
+
   const { typingUsers, startTyping, stopTyping } = useTyping(
     session?.user?.id,
     myProfile?.username
@@ -86,8 +93,6 @@ export default function MobileChannelsPage() {
       new Date(m.created_at) > new Date(lastReadTimestamps[activeChannel?.id || ""] || "1970-01-01")
   ).length;
 
-  const completedCount = challenges.filter((c: any) => c.completed).length;
-
   useEffect(() => {
     const fetchChannels = async () => {
       if (!session?.user?.id) return;
@@ -106,6 +111,7 @@ export default function MobileChannelsPage() {
           return !c.is_private || c.created_by === session?.user?.id || channelIds.includes(c.id);
         });
         setChannels(filteredChannels);
+
         if (!hasRestoredChannel.current) {
           hasRestoredChannel.current = true;
           const persistedChannel = useChatStore.getState().activeChannel;
@@ -114,32 +120,12 @@ export default function MobileChannelsPage() {
           }
           setActiveChannel(filteredChannels.find((c: any) => c.slug === "general") || filteredChannels[0]);
         }
+
+        fetchMemberCounts(filteredChannels.map((c: any) => c.id));
       }
     };
     fetchChannels();
-  }, [setChannels, setActiveChannel, session?.user?.id]);
-
-  useEffect(() => {
-    const fetchMemberCounts = async () => {
-      const channelIds = channels.map((c: any) => c.id);
-      if (channelIds.length === 0) return;
-
-      const { data } = await supabase
-        .from("channel_members")
-        .select("channel_id")
-        .in("channel_id", channelIds);
-
-      if (data) {
-        const counts: Record<string, number> = {};
-        data.forEach((m: any) => {
-          counts[m.channel_id] = (counts[m.channel_id] || 0) + 1;
-        });
-        setMemberCounts(counts);
-      }
-    };
-
-    fetchMemberCounts();
-  }, [channels.length]);
+  }, [session?.user?.id, setChannels, setActiveChannel, fetchMemberCounts]);
 
   useEffect(() => {
     if (messages.length > 0) {
