@@ -4,15 +4,17 @@ use std::time::Duration;
 use tauri::Manager;
 
 #[cfg(not(debug_assertions))]
-fn start_next_server() {
+fn start_next_server(app_handle: &tauri::AppHandle) {
     thread::spawn(|| {
         let mut attempts = 0;
-        let base_path = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .unwrap_or_else(|| std::path::PathBuf::from(".next/standalone"));
+        let base_path = app_handle
+            .path()
+            .resource_dir()
+            .map(|p| p.join(".next/standalone"))
+            .unwrap_or_else(|_| std::path::PathBuf::from(".next/standalone"));
         loop {
             attempts += 1;
+            eprintln!("Trying to start Next.js server from: {:?}", base_path);
             let child = Command::new("node")
                 .current_dir(&base_path)
                 .args(["server.js"])
@@ -61,27 +63,26 @@ fn wait_for_server() {}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    start_next_server();
-    wait_for_server();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            #[cfg(not(debug_assertions))]
+            {
+                start_next_server(app.handle());
+                wait_for_server();
+                let window = app.get_webview_window("main").unwrap();
+                window
+                    .eval("window.location.href = 'http://localhost:3000';")
+                    .ok();
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                let window = app.get_webview_window("main").unwrap();
-                window
-                    .eval("window.location.href = 'http://localhost:3000';")
-                    .ok();
             }
             Ok(())
         })
