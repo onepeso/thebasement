@@ -50,6 +50,12 @@ jobs:
             patchelf \
             libsoup-3.0-dev
 
+      - name: configure git longpaths
+        run: git config --global core.longpaths true
+
+      - name: clean build
+        run: rm -rf .next
+
       - name: install frontend dependencies
         run: pnpm install
 
