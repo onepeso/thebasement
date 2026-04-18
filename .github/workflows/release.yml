@@ -76,3 +76,4 @@ jobs:
           releaseName: "App v__VERSION__"
           releaseBody: "New release! Download the installer below."
           releaseDraft: true
+          args: --bundles deb,rpm,appimage
