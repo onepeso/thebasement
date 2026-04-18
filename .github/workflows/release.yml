@@ -54,7 +54,8 @@ jobs:
         run: git config --global core.longpaths true
 
       - name: clean build
-        run: Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+        shell: bash
+        run: rm -rf .next
 
       - name: install frontend dependencies
         run: pnpm install
